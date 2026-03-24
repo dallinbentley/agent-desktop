@@ -225,14 +225,67 @@ pub fn find_app_window(app_name: &str) -> Option<WindowInfo> {
     })
 }
 
+/// Minimum valid PNG file size in bytes. Files smaller than this are likely blank.
+const MIN_PNG_SIZE: u64 = 1024; // 1KB
+/// Maximum retries for blank screenshot detection.
+const BLANK_SCREENSHOT_MAX_RETRIES: u32 = 3;
+/// Delay between retries in milliseconds.
+const BLANK_SCREENSHOT_RETRY_DELAY_MS: u64 = 500;
+
+/// Check if a PNG file is likely blank (too small to contain real content).
+fn is_blank_screenshot(path: &str) -> bool {
+    match std::fs::metadata(path) {
+        Ok(meta) => meta.len() < MIN_PNG_SIZE,
+        Err(_) => false, // If we can't read metadata, don't retry
+    }
+}
+
 /// Capture a screenshot of a specific window or the frontmost window.
-/// Saves as PNG to temp directory.
+/// Saves as PNG to temp directory. Retries up to 3 times if result is blank (< 1KB).
 pub fn capture_screenshot(full: bool, app: Option<&str>) -> Result<CaptureResult, String> {
     // Check permission
     if !has_screen_recording_permission() {
         return Err("Screen Recording permission required".to_string());
     }
 
+    // Try capture with retry logic for blank screenshots (Task 6.1)
+    let mut last_result: Option<CaptureResult> = None;
+
+    for attempt in 0..=BLANK_SCREENSHOT_MAX_RETRIES {
+        if attempt > 0 {
+            eprintln!(
+                "[capture] Screenshot appears blank (< {}B), retry {}/{}...",
+                MIN_PNG_SIZE, attempt, BLANK_SCREENSHOT_MAX_RETRIES
+            );
+            std::thread::sleep(std::time::Duration::from_millis(BLANK_SCREENSHOT_RETRY_DELAY_MS));
+        }
+
+        let result = capture_screenshot_once(full, app)?;
+
+        if !is_blank_screenshot(&result.path) {
+            return Ok(result);
+        }
+
+        // Clean up blank screenshot file
+        if attempt < BLANK_SCREENSHOT_MAX_RETRIES {
+            let _ = std::fs::remove_file(&result.path);
+        }
+        last_result = Some(result);
+    }
+
+    // All retries exhausted — return error
+    eprintln!(
+        "[capture] WARNING: Screenshot still blank after {} retries",
+        BLANK_SCREENSHOT_MAX_RETRIES
+    );
+    Err(format!(
+        "Screenshot appears blank after {} retries (file < {}B). The window may not be fully rendered yet.",
+        BLANK_SCREENSHOT_MAX_RETRIES, MIN_PNG_SIZE
+    ))
+}
+
+/// Single-attempt screenshot capture (internal helper).
+fn capture_screenshot_once(full: bool, app: Option<&str>) -> Result<CaptureResult, String> {
     if full {
         // Full screen capture
         let null_rect = CGRect::new(&CGPoint::new(0.0, 0.0), &CGSize::new(0.0, 0.0));

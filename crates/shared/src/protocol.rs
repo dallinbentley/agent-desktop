@@ -33,6 +33,8 @@ pub struct SnapshotArgs {
     pub depth: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub app: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selector: Option<String>,
 }
 
 fn default_true() -> bool { true }
@@ -55,12 +57,17 @@ pub struct ClickArgs {
     /// Target app name (for headless click routing)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub app: Option<String>,
+    /// Skip post-click wait (for SPA navigation)
+    #[serde(default)]
+    pub no_wait: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FillArgs {
     pub r#ref: String,
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,6 +75,8 @@ pub struct TypeArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#ref: Option<String>,
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,6 +84,8 @@ pub struct PressArgs {
     pub key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modifiers: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,6 +95,8 @@ pub struct ScrollArgs {
     pub amount: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,6 +119,19 @@ pub struct GetArgs {
     pub what: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WaitArgs {
+    /// Element @ref (e.g. @e5) or milliseconds (e.g. "2000")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ref_or_ms: Option<String>,
+    /// Wait for page load state: "networkidle", "domcontentloaded", "load"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load: Option<String>,
+    /// Target app name
     #[serde(skip_serializing_if = "Option::is_none")]
     pub app: Option<String>,
 }
@@ -165,6 +191,8 @@ pub enum ResponseData {
     GetText(GetTextData),
     #[serde(rename = "status")]
     Status(StatusData),
+    #[serde(rename = "wait")]
+    Wait(WaitData),
 }
 
 // MARK: - Data Payloads
@@ -249,6 +277,11 @@ pub struct GetTextData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#ref: Option<String>,
     pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WaitData {
+    pub waited_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

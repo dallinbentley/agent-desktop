@@ -73,6 +73,7 @@ fn print_data(data: &ResponseData) {
         ResponseData::GetApps(d) => print_get_apps(d),
         ResponseData::GetText(d) => print_get_text(d),
         ResponseData::Status(d) => print_status(d),
+        ResponseData::Wait(d) => print_wait(d),
     }
 }
 
@@ -182,6 +183,10 @@ fn print_get_text(data: &GetTextData) {
     } else {
         println!("{}", data.text);
     }
+}
+
+fn print_wait(data: &WaitData) {
+    println!("Waited {BOLD}{}ms{RESET}", data.waited_ms);
 }
 
 fn print_status(data: &StatusData) {

@@ -52,21 +52,58 @@ pub fn open_app(name: &str) -> Result<(String, i32, bool), agent_computer_shared
 }
 
 /// Open app with CDP (Chrome DevTools Protocol) enabled.
-/// Quits existing instance, relaunches with --remote-debugging-port.
+/// Force-quits existing instance (waits for PID to exit), then relaunches
+/// with --remote-debugging-port. Waits for new PID + CDP port readiness.
 pub fn open_app_with_cdp(
     name: &str,
     state: &mut DaemonState,
 ) -> Result<(String, i32, bool, u16), agent_computer_shared::types::ErrorInfo> {
     let port = deterministic_port(name);
 
-    // Kill existing instance first
-    let _ = Command::new("osascript")
-        .arg("-e")
-        .arg(format!(r#"tell application "{}" to quit"#, name))
-        .output();
+    // Task 5.1: Check if app is already running and get its PID
+    let old_pid = get_app_pid(name);
 
-    // Wait a bit for quit
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    if let Some(old_pid) = old_pid {
+        eprintln!("[app] {} is running (PID {}), quitting before relaunch...", name, old_pid);
+
+        // Send quit via osascript
+        let _ = Command::new("osascript")
+            .arg("-e")
+            .arg(format!(r#"tell application "{}" to quit"#, name))
+            .output();
+
+        // Loop-wait until old PID is gone (100ms intervals, 5s timeout)
+        let mut exited = false;
+        for _ in 0..50 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            // Check if PID is still in the process table
+            let check = Command::new("kill")
+                .arg("-0")
+                .arg(old_pid.to_string())
+                .output();
+            match check {
+                Ok(output) if !output.status.success() => {
+                    // Process is gone
+                    exited = true;
+                    break;
+                }
+                _ => continue,
+            }
+        }
+
+        if !exited {
+            // Force kill if graceful quit didn't work
+            eprintln!("[app] {} didn't quit gracefully, force killing PID {}...", name, old_pid);
+            let _ = Command::new("kill")
+                .arg("-9")
+                .arg(old_pid.to_string())
+                .output();
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+
+        // Remove old PID from cdp_port_map
+        state.cdp_port_map.remove(&old_pid);
+    }
 
     // Relaunch with CDP flag — for Electron apps, pass --remote-debugging-port
     let result = Command::new("open")
@@ -86,10 +123,27 @@ pub fn open_app_with_cdp(
                 )));
             }
 
-            // Wait for app + CDP to be ready
+            // Task 5.2: Wait for new PID to appear (100ms intervals, 10s timeout)
+            let mut new_pid: Option<i32> = None;
+            for _ in 0..100 {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                if let Some(pid) = get_app_pid(name) {
+                    // Make sure it's a new PID (not the old one lingering)
+                    if old_pid.map_or(true, |old| pid != old) {
+                        new_pid = Some(pid);
+                        break;
+                    }
+                }
+            }
+
+            let pid = new_pid.unwrap_or_else(|| {
+                eprintln!("[app] Warning: couldn't detect new PID for {}", name);
+                get_app_pid(name).unwrap_or(0)
+            });
+
+            // Task 5.2: Probe CDP port until responsive (100ms intervals, 10s timeout)
             let mut cdp_ready = false;
-            for _ in 0..50 {
-                // 5 seconds max
+            for _ in 0..100 {
                 std::thread::sleep(std::time::Duration::from_millis(100));
                 if probe_cdp_port(port) {
                     cdp_ready = true;
@@ -98,20 +152,23 @@ pub fn open_app_with_cdp(
             }
 
             if !cdp_ready {
-                // App launched but CDP not ready — still report success with port
                 eprintln!(
                     "Warning: {} launched but CDP not responding on port {}",
                     name, port
                 );
             }
 
-            let pid = get_app_pid(name).unwrap_or(0);
-
             // Track in state
             state.cdp_connections.insert(name.to_string(), port);
             state.port_assignments.insert(name.to_string(), port);
 
-            // Auto-connect agent-browser session (Task 5.2)
+            // Task 5.2: Store in cdp_port_map for PID-based routing
+            if pid != 0 {
+                state.cdp_port_map.insert(pid, (port, name.to_string()));
+                eprintln!("[app] Stored CDP mapping: PID {} → port {} ({})", pid, port, name);
+            }
+
+            // Auto-connect agent-browser session
             if state.browser_bridge.is_available() && cdp_ready {
                 let session = name.to_lowercase().replace(' ', "-");
                 match state.browser_bridge.connect(&session, port) {
@@ -325,10 +382,33 @@ pub fn handle_get(
             }
             match state.ref_map.resolve(ref_id) {
                 Some(elem_ref) => {
-                    // Try to get text via AX re-traversal
+                    // Task 8.2: If ref is CDP-sourced, delegate to browser_bridge.get_web()
+                    if elem_ref.source == agent_computer_shared::types::RefSource::CDP {
+                        if let (Some(ref ab_ref), Some(ref session), Some(cdp_port)) =
+                            (&elem_ref.ab_ref, &elem_ref.ab_session, elem_ref.cdp_port)
+                        {
+                            match state.browser_bridge.get_web(session, cdp_port, "text", Some(ab_ref)) {
+                                Ok(text) => {
+                                    return Response::ok(
+                                        id.to_string(),
+                                        ResponseData::GetText(GetTextData {
+                                            r#ref: Some(ref_id.clone()),
+                                            text: text.trim().to_string(),
+                                        }),
+                                        elapsed(),
+                                    );
+                                }
+                                Err(e) => {
+                                    eprintln!("[get] CDP get_web failed, falling back to label: {}", e);
+                                    // Fall through to label-based approach below
+                                }
+                            }
+                        }
+                    }
+
+                    // AX-based text retrieval
                     let text = if let (Some(ref path), Some(pid)) = (&elem_ref.ax_path, elem_ref.ax_pid) {
                         if let Some(ax_elem) = ax_engine::re_traverse_to_element(path, pid) {
-                            // Try value, title, description (same as Swift)
                             let result = elem_ref.label.clone().unwrap_or_default();
                             unsafe { core_foundation::base::CFRelease(ax_elem as core_foundation::base::CFTypeRef); }
                             result
@@ -355,10 +435,60 @@ pub fn handle_get(
                 ),
             }
         }
+        "title" | "url" => {
+            // Task 8.2: title/url via CDP — these don't require a ref
+            let what = args.what.to_lowercase();
+
+            // Determine CDP session/port
+            let (session, port) = if let Some(ref app_name) = args.app {
+                let session = app_name.to_lowercase().replace(' ', "-");
+                let port = state.get_cdp_port_for_app(app_name);
+                (Some(session), port)
+            } else if state.last_snapshot_cdp_sourced {
+                (state.last_cdp_session.clone(), state.last_cdp_port)
+            } else {
+                (None, None)
+            };
+
+            if let (Some(session), Some(port)) = (session, port) {
+                let ab_ref = args.r#ref.as_ref().map(|r| {
+                    // Look up agent-browser ref from ref map
+                    state.ref_map.resolve(r)
+                        .and_then(|e| e.ab_ref.clone())
+                        .unwrap_or_else(|| r.clone())
+                });
+                match state.browser_bridge.get_web(&session, port, &what, ab_ref.as_deref()) {
+                    Ok(text) => {
+                        Response::ok(
+                            id.to_string(),
+                            ResponseData::GetText(GetTextData {
+                                r#ref: args.r#ref.clone(),
+                                text: text.trim().to_string(),
+                            }),
+                            elapsed(),
+                        )
+                    }
+                    Err(e) => Response::fail(
+                        id.to_string(),
+                        errors::cdp_error(&format!("get {} failed: {}", what, e)),
+                        elapsed(),
+                    ),
+                }
+            } else {
+                Response::fail(
+                    id.to_string(),
+                    errors::invalid_command(&format!(
+                        "'get {}' requires a CDP app (use --app or snapshot a CDP app first)",
+                        what
+                    )),
+                    elapsed(),
+                )
+            }
+        }
         _ => Response::fail(
             id.to_string(),
             errors::invalid_command(&format!(
-                "Unknown get target: '{}'. Valid: apps, text",
+                "Unknown get target: '{}'. Valid: apps, text, title, url",
                 args.what
             )),
             elapsed(),

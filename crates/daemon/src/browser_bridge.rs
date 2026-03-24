@@ -169,15 +169,24 @@ impl BrowserBridge {
 
     /// Take an agent-browser snapshot and return parsed elements.
     /// If `interactive` is true, passes `-i` for interactive-only elements.
+    /// If `selector` is Some, passes `-s "<selector>"` to scope the snapshot.
     pub fn snapshot(
         &self,
         session: &str,
         cdp_port: u16,
         interactive: bool,
+        selector: Option<&str>,
     ) -> Result<Vec<ParsedElement>, String> {
         let mut args = vec!["snapshot"];
         if interactive {
             args.push("-i");
+        }
+
+        let selector_owned: String;
+        if let Some(sel) = selector {
+            args.push("-s");
+            selector_owned = sel.to_string();
+            args.push(&selector_owned);
         }
 
         let raw_output = self.execute(session, cdp_port, &args)?;
@@ -191,10 +200,18 @@ impl BrowserBridge {
         session: &str,
         cdp_port: u16,
         interactive: bool,
+        selector: Option<&str>,
     ) -> Result<(String, Vec<ParsedElement>), String> {
         let mut args = vec!["snapshot"];
         if interactive {
             args.push("-i");
+        }
+
+        let selector_owned: String;
+        if let Some(sel) = selector {
+            args.push("-s");
+            selector_owned = sel.to_string();
+            args.push(&selector_owned);
         }
 
         let raw_output = self.execute(session, cdp_port, &args)?;
@@ -268,6 +285,40 @@ impl BrowserBridge {
         let amount_str = amount.to_string();
         self.execute(session, cdp_port, &["scroll", direction, &amount_str])?;
         Ok(())
+    }
+
+    // MARK: - Wait
+
+    /// Wait for an element, time, or page load state via agent-browser.
+    /// Delegates to `agent-browser --session <s> --cdp <port> wait <args>`.
+    pub fn wait(&self, session: &str, cdp_port: u16, args: &[&str]) -> Result<String, String> {
+        let mut cmd_args = vec!["wait"];
+        cmd_args.extend_from_slice(args);
+        self.execute(session, cdp_port, &cmd_args)
+    }
+
+    // MARK: - Get Web Content
+
+    /// Get text/title/url from web content via agent-browser.
+    /// Delegates to `agent-browser --session <s> --cdp <port> get <what> [@ref]`.
+    pub fn get_web(
+        &self,
+        session: &str,
+        cdp_port: u16,
+        what: &str,
+        ab_ref: Option<&str>,
+    ) -> Result<String, String> {
+        let mut args = vec!["get", what];
+        let ref_arg: String;
+        if let Some(r) = ab_ref {
+            ref_arg = if r.starts_with('@') {
+                r.to_string()
+            } else {
+                format!("@{}", r)
+            };
+            args.push(&ref_arg);
+        }
+        self.execute(session, cdp_port, &args)
     }
 
     // MARK: - 2.5 Lifecycle

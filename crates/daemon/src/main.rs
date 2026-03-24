@@ -30,6 +30,9 @@ pub struct DaemonState {
     pub cdp_connections: HashMap<String, u16>,
     /// Deterministic port assignments: app_name -> port
     pub port_assignments: HashMap<String, u16>,
+    /// CDP port ownership map: pid → (port, app_name)
+    /// Used to route CDP connections to the correct app when multiple Electron apps are running.
+    pub cdp_port_map: HashMap<i32, (u16, String)>,
     /// Browser bridge for agent-browser subprocess management
     pub browser_bridge: browser_bridge::BrowserBridge,
     /// Track whether the last snapshot was CDP-sourced (for press/scroll delegation)
@@ -51,11 +54,30 @@ impl DaemonState {
             ref_map: refmap::RefMap::new(),
             cdp_connections: HashMap::new(),
             port_assignments: HashMap::new(),
+            cdp_port_map: HashMap::new(),
             browser_bridge: bridge,
             last_snapshot_cdp_sourced: false,
             last_cdp_session: None,
             last_cdp_port: None,
         }
+    }
+
+    /// Look up the CDP port for an app by name, checking the PID-based port map first,
+    /// then falling back to cdp_connections.
+    pub fn get_cdp_port_for_app(&self, app_name: &str) -> Option<u16> {
+        // Check cdp_port_map entries by app_name (PID-verified ownership)
+        for (_, (port, name)) in &self.cdp_port_map {
+            if name.eq_ignore_ascii_case(app_name) {
+                return Some(*port);
+            }
+        }
+        // Fallback to cdp_connections (legacy)
+        self.cdp_connections.get(app_name).copied()
+    }
+
+    /// Look up the CDP port for a PID directly from the port map.
+    pub fn get_cdp_port_for_pid(&self, pid: i32) -> Option<u16> {
+        self.cdp_port_map.get(&pid).map(|(port, _)| *port)
     }
 
     pub fn ref_map_count(&self) -> i32 {
@@ -97,6 +119,7 @@ pub fn handle_command(
         "type" => handle_type(id, args, state, start),
         "press" => handle_press(id, args, state, start),
         "scroll" => handle_scroll(id, args, state, start),
+        "wait" => handle_wait(id, args, state, start),
         "screenshot" => handle_screenshot(id, args, start),
         "open" => {
             let open_args: OpenArgs = match serde_json::from_value(args.clone()) {
@@ -148,6 +171,7 @@ fn handle_snapshot(
         compact: false,
         depth: None,
         app: None,
+        selector: None,
     });
 
     let depth = snap_args.depth.unwrap_or(20);
@@ -179,8 +203,10 @@ fn handle_snapshot(
         }
     };
 
-    // Detect app kind and determine snapshot strategy
-    let app_kind = detector::detect_app_from_pid(pid);
+    // Detect app kind — check PID-based port map first for accurate CDP routing
+    let known_port = state.get_cdp_port_for_pid(pid)
+        .or_else(|| state.get_cdp_port_for_app(&app_name));
+    let app_kind = detector::detect_app_from_pid_with_known_port(pid, known_port);
     let strategy = detector::snapshot_strategy(&app_kind);
 
     match strategy {
@@ -232,7 +258,7 @@ fn handle_snapshot(
             }
 
             let session = app_name.to_lowercase().replace(' ', "-");
-            match state.browser_bridge.snapshot(&session, cdp_port, snap_args.interactive) {
+            match state.browser_bridge.snapshot(&session, cdp_port, snap_args.interactive, snap_args.selector.as_deref()) {
                 Ok(parsed_elements) => {
                     // Build ElementRefs from parsed agent-browser output
                     let mut refs = Vec::new();
@@ -312,7 +338,7 @@ fn handle_snapshot(
             // Try to get web content via agent-browser
             let session = app_name.to_lowercase().replace(' ', "-");
             let (merged_text, all_refs, cdp_sourced) = if state.browser_bridge.is_available() {
-                match state.browser_bridge.snapshot(&session, cdp_port, snap_args.interactive) {
+                match state.browser_bridge.snapshot(&session, cdp_port, snap_args.interactive, snap_args.selector.as_deref()) {
                     Ok(parsed_elements) => {
                         let mut text = ax_text;
                         let ax_count = ax_refs.len();
@@ -554,6 +580,20 @@ fn handle_click(
             // Agent-browser click — delegate to bridge
             match state.browser_bridge.click(&session, cdp_port, &ab_ref) {
                 Ok(_) => {
+                    // Task 4.1: Post-click delay for CDP clicks (skip if --no-wait)
+                    if !click_args.no_wait {
+                        // Task 4.2: Longer wait for link-type elements (SPA navigation)
+                        let is_link = element.role.to_lowercase().contains("link");
+                        if is_link {
+                            // For links, use agent-browser wait to let SPA routers update
+                            let _ = state.browser_bridge.execute(
+                                &session, cdp_port, &["wait", "500"]
+                            );
+                        } else {
+                            std::thread::sleep(std::time::Duration::from_millis(500));
+                        }
+                    }
+
                     let coords = element.center().map(|(x, y)| Point { x, y }).unwrap_or(Point { x: 0.0, y: 0.0 });
                     Response::ok(
                         id.to_string(),
@@ -613,6 +653,34 @@ fn handle_fill(
             );
         }
     };
+
+    // Task 2.2: When --app is specified and app has a CDP port, delegate to browser_bridge
+    if let Some(ref app_name) = fill_args.app {
+        if let Some(cdp_port) = state.get_cdp_port_for_app(app_name) {
+            let session = app_name.to_lowercase().replace(' ', "-");
+            let ref_id = &fill_args.r#ref;
+            // Look up the agent-browser ref from the ref map
+            let ab_ref = state.ref_map.resolve(ref_id)
+                .and_then(|e| e.ab_ref.clone())
+                .unwrap_or_else(|| ref_id.clone());
+            match state.browser_bridge.fill(&session, cdp_port, &ab_ref, &fill_args.text) {
+                Ok(_) => {
+                    return Response::ok(
+                        id.to_string(),
+                        ResponseData::Fill(FillData {
+                            r#ref: fill_args.r#ref,
+                            text: fill_args.text,
+                        }),
+                        elapsed(),
+                    );
+                }
+                Err(e) => {
+                    log(&format!("CDP fill failed for {}, falling back to AX: {}", app_name, e));
+                    // Fall through to ref_map routing below
+                }
+            }
+        }
+    }
 
     if state.ref_map.is_empty() {
         return Response::fail(id.to_string(), errors::no_ref_map(), elapsed());
@@ -746,6 +814,36 @@ fn handle_type(
         }
     };
 
+    // Task 2.2: When --app is specified and app has a CDP port, delegate to browser_bridge
+    if let Some(ref app_name) = type_args.app {
+        if let Some(cdp_port) = state.get_cdp_port_for_app(app_name) {
+            let session = app_name.to_lowercase().replace(' ', "-");
+            if let Some(ref ref_id) = type_args.r#ref {
+                let ab_ref = state.ref_map.resolve(ref_id)
+                    .and_then(|e| e.ab_ref.clone())
+                    .unwrap_or_else(|| ref_id.clone());
+                match state.browser_bridge.type_text(&session, cdp_port, &ab_ref, &type_args.text) {
+                    Ok(_) => {
+                        return Response::ok(
+                            id.to_string(),
+                            ResponseData::Type(TypeData {
+                                r#ref: type_args.r#ref,
+                                text: type_args.text,
+                            }),
+                            elapsed(),
+                        );
+                    }
+                    Err(e) => {
+                        log(&format!("CDP type failed for {}, falling back: {}", app_name, e));
+                    }
+                }
+            } else {
+                // Type without ref into CDP app — use press for each char
+                // Fall through to normal handling
+            }
+        }
+    }
+
     if let Some(ref ref_id) = type_args.r#ref {
         // Type into a specific element
         if state.ref_map.is_empty() {
@@ -821,6 +919,29 @@ fn handle_press(
         }
     };
 
+    // Task 2.2: When --app is specified and app has a CDP port, delegate to browser_bridge
+    if let Some(ref app_name) = press_args.app {
+        if let Some(cdp_port) = state.get_cdp_port_for_app(app_name) {
+            let session = app_name.to_lowercase().replace(' ', "-");
+            match state.browser_bridge.press(&session, cdp_port, &press_args.key) {
+                Ok(()) => {
+                    return Response::ok(
+                        id.to_string(),
+                        ResponseData::Press(PressData {
+                            key: press_args.key,
+                            modifiers: press_args.modifiers.unwrap_or_default(),
+                        }),
+                        elapsed(),
+                    );
+                }
+                Err(e) => {
+                    log(&format!("CDP press failed for {}, falling back to CGEvent: {}", app_name, e));
+                    // Fall through to CGEvent below
+                }
+            }
+        }
+    }
+
     // If last snapshot was CDP-sourced, delegate to agent-browser for headless key press
     if state.last_snapshot_cdp_sourced {
         if let (Some(ref session), Some(cdp_port)) = (&state.last_cdp_session, state.last_cdp_port) {
@@ -894,6 +1015,29 @@ fn handle_scroll(
 
     let amount = scroll_args.amount.unwrap_or(3); // Default 3 lines
 
+    // Task 2.2: When --app is specified and app has a CDP port, delegate to browser_bridge
+    if let Some(ref app_name) = scroll_args.app {
+        if let Some(cdp_port) = state.get_cdp_port_for_app(app_name) {
+            let session = app_name.to_lowercase().replace(' ', "-");
+            match state.browser_bridge.scroll(&session, cdp_port, &scroll_args.direction, amount) {
+                Ok(()) => {
+                    return Response::ok(
+                        id.to_string(),
+                        ResponseData::Scroll(ScrollData {
+                            direction: scroll_args.direction,
+                            amount,
+                        }),
+                        elapsed(),
+                    );
+                }
+                Err(e) => {
+                    log(&format!("CDP scroll failed for {}, falling back to CGEvent: {}", app_name, e));
+                    // Fall through to CGEvent below
+                }
+            }
+        }
+    }
+
     // If last snapshot was CDP-sourced, delegate to agent-browser for headless scroll
     if state.last_snapshot_cdp_sourced {
         if let (Some(ref session), Some(cdp_port)) = (&state.last_cdp_session, state.last_cdp_port) {
@@ -924,6 +1068,154 @@ fn handle_scroll(
             direction: scroll_args.direction,
             amount,
         }),
+        elapsed(),
+    )
+}
+
+// MARK: - Wait Command (Task 3.3)
+
+fn handle_wait(
+    id: &str,
+    args: &serde_json::Value,
+    state: &mut DaemonState,
+    start: std::time::Instant,
+) -> Response {
+    let elapsed = || start.elapsed().as_secs_f64() * 1000.0;
+
+    let wait_args: WaitArgs = match serde_json::from_value(args.clone()) {
+        Ok(a) => a,
+        Err(_) => {
+            return Response::fail(
+                id.to_string(),
+                errors::invalid_command("wait requires args (ref_or_ms or --load)"),
+                elapsed(),
+            );
+        }
+    };
+
+    // Determine CDP session/port: from --app flag or from last snapshot context
+    let (cdp_session, cdp_port) = if let Some(ref app_name) = wait_args.app {
+        let session = app_name.to_lowercase().replace(' ', "-");
+        let port = state.get_cdp_port_for_app(app_name);
+        (Some(session), port)
+    } else if state.last_snapshot_cdp_sourced {
+        (state.last_cdp_session.clone(), state.last_cdp_port)
+    } else {
+        (None, None)
+    };
+
+    // Handle --load flag (CDP only)
+    if let Some(ref load_state) = wait_args.load {
+        let valid_states = ["networkidle", "domcontentloaded", "load"];
+        if !valid_states.contains(&load_state.as_str()) {
+            return Response::fail(
+                id.to_string(),
+                errors::invalid_command(&format!(
+                    "Invalid --load state '{}'. Use: networkidle, domcontentloaded, load",
+                    load_state
+                )),
+                elapsed(),
+            );
+        }
+
+        if let (Some(session), Some(port)) = (&cdp_session, cdp_port) {
+            match state.browser_bridge.wait(session, port, &["--load", load_state]) {
+                Ok(_) => {
+                    let waited_ms = start.elapsed().as_millis() as u64;
+                    return Response::ok(
+                        id.to_string(),
+                        ResponseData::Wait(WaitData { waited_ms }),
+                        elapsed(),
+                    );
+                }
+                Err(e) => {
+                    return Response::fail(
+                        id.to_string(),
+                        errors::cdp_error(&format!("wait --load failed: {}", e)),
+                        elapsed(),
+                    );
+                }
+            }
+        } else {
+            return Response::fail(
+                id.to_string(),
+                errors::invalid_command("wait --load requires a CDP app (use --app or snapshot a CDP app first)"),
+                elapsed(),
+            );
+        }
+    }
+
+    // Handle ref_or_ms
+    if let Some(ref arg) = wait_args.ref_or_ms {
+        // Check if numeric → sleep
+        if let Ok(ms) = arg.parse::<u64>() {
+            std::thread::sleep(std::time::Duration::from_millis(ms));
+            return Response::ok(
+                id.to_string(),
+                ResponseData::Wait(WaitData { waited_ms: ms }),
+                elapsed(),
+            );
+        }
+
+        // Check if @ref → wait for element
+        if let Some(ref_id) = parse_ref(arg) {
+            // If we have CDP context, delegate to agent-browser wait
+            if let (Some(session), Some(port)) = (&cdp_session, cdp_port) {
+                let ref_arg = format!("@{}", ref_id);
+                match state.browser_bridge.wait(session, port, &[&ref_arg]) {
+                    Ok(_) => {
+                        let waited_ms = start.elapsed().as_millis() as u64;
+                        return Response::ok(
+                            id.to_string(),
+                            ResponseData::Wait(WaitData { waited_ms }),
+                            elapsed(),
+                        );
+                    }
+                    Err(e) => {
+                        return Response::fail(
+                            id.to_string(),
+                            errors::cdp_error(&format!("wait for element failed: {}", e)),
+                            elapsed(),
+                        );
+                    }
+                }
+            } else {
+                // AX context: poll the ref map for the element to appear
+                // Poll for up to 10 seconds at 200ms intervals
+                for _ in 0..50 {
+                    if state.ref_map.resolve(&ref_id).is_some() {
+                        let waited_ms = start.elapsed().as_millis() as u64;
+                        return Response::ok(
+                            id.to_string(),
+                            ResponseData::Wait(WaitData { waited_ms }),
+                            elapsed(),
+                        );
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                }
+                return Response::fail(
+                    id.to_string(),
+                    errors::ref_not_found(&ref_id),
+                    elapsed(),
+                );
+            }
+        }
+
+        // Not numeric, not a ref
+        return Response::fail(
+            id.to_string(),
+            errors::invalid_command(&format!(
+                "Invalid wait argument '{}'. Use milliseconds (e.g. 2000) or @ref (e.g. @e5)",
+                arg
+            )),
+            elapsed(),
+        );
+    }
+
+    // No args at all
+    Response::fail(
+        id.to_string(),
+        errors::invalid_command("wait requires a time (ms), @ref, or --load flag"),
         elapsed(),
     )
 }
@@ -975,6 +1267,16 @@ fn handle_screenshot(
 }
 
 // MARK: - Helpers
+
+/// Parse an @ref string: strip @, validate e\d+ format.
+fn parse_ref(input: &str) -> Option<String> {
+    let stripped = input.strip_prefix('@').unwrap_or(input);
+    if stripped.starts_with('e') && stripped.len() > 1 && stripped[1..].chars().all(|c| c.is_ascii_digit()) {
+        Some(stripped.to_string())
+    } else {
+        None
+    }
+}
 
 /// Get app PID by name using osascript.
 fn get_app_pid_by_name(name: &str) -> Option<(String, i32)> {

@@ -51,6 +51,10 @@ enum Commands {
         /// Target app name
         #[arg(long)]
         app: Option<String>,
+
+        /// CSS selector to scope snapshot (CDP only)
+        #[arg(short, long)]
+        selector: Option<String>,
     },
 
     /// Click an element by @ref or coordinates
@@ -76,6 +80,10 @@ enum Commands {
         /// Target app name (headless click)
         #[arg(long)]
         app: Option<String>,
+
+        /// Skip post-click wait for SPA navigation
+        #[arg(long)]
+        no_wait: bool,
     },
 
     /// Clear and fill a text field
@@ -85,6 +93,10 @@ enum Commands {
 
         /// Text to fill
         text: String,
+
+        /// Target app name
+        #[arg(long)]
+        app: Option<String>,
     },
 
     /// Type text, optionally into a specific element
@@ -94,12 +106,20 @@ enum Commands {
 
         /// Text to type (when ref is provided)
         text: Option<String>,
+
+        /// Target app name
+        #[arg(long)]
+        app: Option<String>,
     },
 
     /// Press a key or key combination (e.g. cmd+c, enter)
     Press {
         /// Key combo (e.g. cmd+shift+s, enter, tab)
         key: String,
+
+        /// Target app name
+        #[arg(long)]
+        app: Option<String>,
     },
 
     /// Scroll in a direction
@@ -109,6 +129,10 @@ enum Commands {
 
         /// Amount in pixels (default: 300)
         amount: Option<i32>,
+
+        /// Target app name
+        #[arg(long)]
+        app: Option<String>,
     },
 
     /// Capture a screenshot
@@ -139,6 +163,20 @@ enum Commands {
 
         /// Element @ref (for text/title)
         r#ref: Option<String>,
+
+        /// Target app name
+        #[arg(long)]
+        app: Option<String>,
+    },
+
+    /// Wait for an element, time, or page load state
+    Wait {
+        /// Element @ref (e.g. @e5) or milliseconds (e.g. 2000)
+        ref_or_ms: Option<String>,
+
+        /// Wait for page load state: networkidle, domcontentloaded, load
+        #[arg(long)]
+        load: Option<String>,
 
         /// Target app name
         #[arg(long)]
@@ -212,12 +250,14 @@ fn main() {
             compact,
             depth,
             app,
+            selector,
         } => {
             let args = SnapshotArgs {
                 interactive: *interactive,
                 compact: *compact,
                 depth: *depth,
                 app: app.clone(),
+                selector: selector.clone(),
             };
             ("snapshot", serde_json::to_value(args).unwrap())
         }
@@ -228,6 +268,7 @@ fn main() {
             right,
             foreground,
             app,
+            no_wait,
         } => {
             if let Some(y_val) = y {
                 // Coordinate pair mode
@@ -241,6 +282,7 @@ fn main() {
                             right: *right,
                             foreground: *foreground,
                             app: app.clone(),
+                            no_wait: *no_wait,
                         };
                         ("click", serde_json::to_value(args).unwrap())
                     }
@@ -258,6 +300,7 @@ fn main() {
                     right: *right,
                     foreground: *foreground,
                     app: app.clone(),
+                    no_wait: *no_wait,
                 };
                 ("click", serde_json::to_value(args).unwrap())
             } else if ref_or_x.parse::<f64>().is_ok() {
@@ -271,12 +314,13 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Commands::Fill { r#ref, text } => {
+        Commands::Fill { r#ref, text, app } => {
             match parse_ref(r#ref) {
                 Some(parsed_ref) => {
                     let args = FillArgs {
                         r#ref: parsed_ref,
                         text: text.clone(),
+                        app: app.clone(),
                     };
                     ("fill", serde_json::to_value(args).unwrap())
                 }
@@ -292,6 +336,7 @@ fn main() {
         Commands::Type {
             ref_or_text,
             text,
+            app,
         } => {
             if let Some(text_val) = text {
                 // Two arguments: first is ref, second is text
@@ -300,6 +345,7 @@ fn main() {
                         let args = TypeArgs {
                             r#ref: Some(parsed_ref),
                             text: text_val.clone(),
+                            app: app.clone(),
                         };
                         ("type", serde_json::to_value(args).unwrap())
                     }
@@ -316,11 +362,12 @@ fn main() {
                 let args = TypeArgs {
                     r#ref: None,
                     text: ref_or_text.clone(),
+                    app: app.clone(),
                 };
                 ("type", serde_json::to_value(args).unwrap())
             }
         }
-        Commands::Press { key } => {
+        Commands::Press { key, app } => {
             let (parsed_key, modifiers) = parse_key_combo(key);
             let args = PressArgs {
                 key: parsed_key,
@@ -329,10 +376,11 @@ fn main() {
                 } else {
                     Some(modifiers)
                 },
+                app: app.clone(),
             };
             ("press", serde_json::to_value(args).unwrap())
         }
-        Commands::Scroll { direction, amount } => {
+        Commands::Scroll { direction, amount, app } => {
             let dir = direction.to_lowercase();
             let valid = ["up", "down", "left", "right"];
             if !valid.contains(&dir.as_str()) {
@@ -346,6 +394,7 @@ fn main() {
                 direction: dir,
                 amount: *amount,
                 r#ref: None,
+                app: app.clone(),
             };
             ("scroll", serde_json::to_value(args).unwrap())
         }
@@ -364,11 +413,11 @@ fn main() {
             ("open", serde_json::to_value(args).unwrap())
         }
         Commands::Get { what, r#ref, app } => {
-            let valid_whats = ["text", "title", "apps", "windows"];
+            let valid_whats = ["text", "title", "url", "apps", "windows"];
             let what_lower = what.to_lowercase();
             if !valid_whats.contains(&what_lower.as_str()) {
                 eprintln!(
-                    "Error: Invalid target '{}'. Use: text, title, apps, windows.",
+                    "Error: Invalid target '{}'. Use: text, title, url, apps, windows.",
                     what
                 );
                 std::process::exit(1);
@@ -395,6 +444,14 @@ fn main() {
                 app: app.clone(),
             };
             ("get", serde_json::to_value(args).unwrap())
+        }
+        Commands::Wait { ref_or_ms, load, app } => {
+            let args = WaitArgs {
+                ref_or_ms: ref_or_ms.clone(),
+                load: load.clone(),
+                app: app.clone(),
+            };
+            ("wait", serde_json::to_value(args).unwrap())
         }
         Commands::Status => {
             ("status", serde_json::Value::Object(serde_json::Map::new()))

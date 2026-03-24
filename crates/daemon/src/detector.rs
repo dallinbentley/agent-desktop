@@ -163,8 +163,36 @@ pub fn get_bundle_id_for_pid(pid: i32) -> Option<String> {
 
 /// Full detection: given just a PID, detect the app kind
 pub fn detect_app_from_pid(pid: i32) -> AppKind {
+    detect_app_from_pid_with_known_port(pid, None)
+}
+
+/// Full detection with an optional known CDP port.
+/// When a known port is provided (e.g. from DaemonState.cdp_port_map),
+/// it is used directly instead of scanning ports 9222-9229.
+/// This prevents connecting to the wrong app's CDP endpoint.
+pub fn detect_app_from_pid_with_known_port(pid: i32, known_cdp_port: Option<u16>) -> AppKind {
     let bundle_id = get_bundle_id_for_pid(pid);
     let bundle_path = get_bundle_path_for_pid(pid);
+
+    // If we have a known port, use it directly instead of scanning
+    if let Some(port) = known_cdp_port {
+        // Still determine the app category (Browser/Electron/CEF/Native)
+        if let Some(bid) = &bundle_id {
+            if KNOWN_BROWSER_BUNDLE_IDS.contains(bid.as_str()) {
+                return AppKind::Browser { cdp_port: Some(port) };
+            }
+        }
+        if let Some(ref path) = bundle_path {
+            if has_electron_framework(path) {
+                return AppKind::Electron { cdp_port: Some(port) };
+            }
+            if has_cef_framework(path) {
+                return AppKind::CEF { cdp_port: Some(port) };
+            }
+        }
+        // Known port but unknown app type — treat as Electron (most common CDP case)
+        return AppKind::Electron { cdp_port: Some(port) };
+    }
 
     detect_app(
         pid,
