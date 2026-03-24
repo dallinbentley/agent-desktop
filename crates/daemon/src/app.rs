@@ -22,22 +22,8 @@ pub fn open_app_background(name: &str) -> Result<(String, i32, bool), agent_comp
 }
 
 fn open_app_with_options(name: &str, background: bool) -> Result<(String, i32, bool), agent_computer_shared::types::ErrorInfo> {
-    // Check if already running via pgrep-style approach using `osascript`
-    let check = Command::new("osascript")
-        .arg("-e")
-        .arg(format!(
-            r#"tell application "System Events" to set appList to name of every process whose name is "{}""#,
-            name
-        ))
-        .output();
-
-    let was_running = match &check {
-        Ok(out) => {
-            let output = String::from_utf8_lossy(&out.stdout);
-            !output.trim().is_empty()
-        }
-        Err(_) => false,
-    };
+    // Check if already running via NSWorkspace native API
+    let was_running = agent_computer_daemon::ns_workspace::is_app_running(name);
 
     // Use `open -a` to open. Add flags for background mode.
     let mut cmd = Command::new("open");
@@ -228,8 +214,14 @@ fn probe_cdp_port(port: u16) -> bool {
     .is_ok()
 }
 
-/// Get PID of an app by name using pgrep.
+/// Get PID of an app by name using NSWorkspace native API.
+/// Falls back to pgrep for apps that may have different process names.
 fn get_app_pid(name: &str) -> Option<i32> {
+    // Try NSWorkspace first (fast, no subprocess)
+    if let Some(pid) = agent_computer_daemon::ns_workspace::get_app_pid_by_name(name) {
+        return Some(pid);
+    }
+    // Fallback to pgrep for apps whose process name differs from display name
     let output = Command::new("pgrep")
         .arg("-x")
         .arg(name)
@@ -239,91 +231,19 @@ fn get_app_pid(name: &str) -> Option<i32> {
     stdout.trim().lines().next()?.parse().ok()
 }
 
-/// Get list of running GUI app names using osascript.
+/// Get list of running GUI app names using NSWorkspace native API.
 fn get_running_app_names() -> Vec<String> {
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(r#"tell application "System Events" to get name of every process whose background only is false"#)
-        .output();
-
-    match output {
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            stdout
-                .trim()
-                .split(", ")
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-                .collect()
-        }
-        Err(_) => vec![],
-    }
+    agent_computer_daemon::ns_workspace::get_running_app_names()
 }
 
-/// Get running GUI apps as AppInfo structs.
+/// Get running GUI apps as AppInfo structs using NSWorkspace native API.
 fn get_running_gui_apps() -> Vec<AppInfo> {
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(r#"tell application "System Events"
-    set appList to every process whose background only is false
-    set output to ""
-    repeat with anApp in appList
-        set appName to name of anApp
-        set appPID to unix id of anApp
-        set isFront to (frontmost of anApp)
-        set output to output & appName & "||" & appPID & "||" & isFront & linefeed
-    end repeat
-    return output
-end tell"#)
-        .output();
-
-    match output {
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            stdout
-                .trim()
-                .lines()
-                .filter_map(|line| {
-                    let parts: Vec<&str> = line.split("||").collect();
-                    if parts.len() >= 3 {
-                        let name = parts[0].to_string();
-                        let pid = parts[1].parse::<i32>().unwrap_or(0);
-                        let is_active = parts[2].trim() == "true";
-                        Some(AppInfo {
-                            name,
-                            pid,
-                            is_active,
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        }
-        Err(_) => vec![],
-    }
+    agent_computer_daemon::ns_workspace::get_running_gui_apps()
 }
 
-/// Get the frontmost window title for an app.
-fn get_frontmost_window_title(app_name: &str) -> Option<String> {
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(format!(
-            r#"tell application "System Events"
-    try
-        set winTitle to name of front window of process "{app_name}"
-        return winTitle
-    on error
-        return ""
-    end try
-end tell"#
-        ))
-        .output()
-        .ok()?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let title = stdout.trim().to_string();
-    if title.is_empty() { None } else { Some(title) }
+/// Get the frontmost window title for an app using AX API.
+fn get_frontmost_window_title_for_pid(pid: i32) -> Option<String> {
+    ax_engine::get_window_title_for_pid(pid)
 }
 
 // MARK: - Command Handlers
@@ -536,8 +456,8 @@ pub fn handle_status(
     // Use AX engine for frontmost app detection (more reliable)
     let (frontmost_app, frontmost_pid, frontmost_window) = match ax_engine::get_frontmost_app() {
         Some((name, pid)) => {
-            // Get window title via osascript (simpler than AX window traversal here)
-            let window = get_frontmost_window_title(&name);
+            // Get window title via AX API (native, no subprocess)
+            let window = get_frontmost_window_title_for_pid(pid);
             (Some(name), Some(pid), window)
         }
         None => (None, None, None),

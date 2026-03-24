@@ -106,20 +106,74 @@ fn connect_or_start_daemon(
         return Ok(stream);
     }
 
-    // Socket not available — start daemon
+    // Socket not available — start daemon with ready-pipe
     eprintln!("Starting agent-computer daemon...");
-    spawn_daemon(verbose)?;
+    let read_fd = spawn_daemon(verbose)?;
 
-    // Poll for socket availability (100ms intervals, 5s timeout)
+    // If we got a ready-pipe read fd, block on it for instant wake
+    if let Some(fd) = read_fd {
+        if verbose {
+            eprintln!("[verbose] Waiting on ready-pipe for daemon signal...");
+        }
+
+        let pipe_ready = wait_on_ready_pipe(fd, Duration::from_secs(2));
+
+        // Close read fd
+        unsafe { libc::close(fd); }
+
+        if pipe_ready {
+            // Daemon signaled ready — connect immediately
+            if let Some(stream) = try_connect(socket_path) {
+                return Ok(stream);
+            }
+            // Pipe signaled but socket not yet connectable — brief retry
+            for _ in 0..10 {
+                std::thread::sleep(Duration::from_millis(5));
+                if let Some(stream) = try_connect(socket_path) {
+                    return Ok(stream);
+                }
+            }
+        }
+
+        if verbose {
+            eprintln!("[verbose] Ready-pipe failed or timed out, falling back to polling");
+        }
+    }
+
+    // Fallback: poll for socket availability (10ms intervals, 5s timeout)
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     while std::time::Instant::now() < deadline {
         if let Some(stream) = try_connect(socket_path) {
             return Ok(stream);
         }
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_millis(10));
     }
 
     Err(ConnectionError::DaemonStartTimeout)
+}
+
+/// Wait on the read end of the ready-pipe with a timeout.
+/// Returns true if a byte was received (daemon ready), false on timeout/error/EOF.
+fn wait_on_ready_pipe(read_fd: i32, timeout: Duration) -> bool {
+    // Use poll() to wait on the fd with a timeout
+    let timeout_ms = timeout.as_millis() as i32;
+    let mut pollfd = libc::pollfd {
+        fd: read_fd,
+        events: libc::POLLIN,
+        revents: 0,
+    };
+
+    let ret = unsafe { libc::poll(&mut pollfd, 1, timeout_ms) };
+
+    if ret <= 0 {
+        // Timeout (0) or error (-1)
+        return false;
+    }
+
+    // Data available — read 1 byte
+    let mut buf = [0u8; 1];
+    let n = unsafe { libc::read(read_fd, buf.as_mut_ptr() as *mut libc::c_void, 1) };
+    n == 1
 }
 
 /// Try to connect to Unix socket. Returns stream on success, None on failure.
@@ -132,7 +186,8 @@ fn try_connect(socket_path: &PathBuf) -> Option<UnixStream> {
 }
 
 /// Spawn the daemon as a background process.
-fn spawn_daemon(verbose: bool) -> Result<(), ConnectionError> {
+/// Returns the read fd of the ready-pipe (if pipe creation succeeded), or None.
+fn spawn_daemon(verbose: bool) -> Result<Option<i32>, ConnectionError> {
     // Find the daemon binary relative to the CLI binary
     let cli_path = std::env::current_exe().ok();
     let daemon_path = cli_path
@@ -158,12 +213,36 @@ fn spawn_daemon(verbose: bool) -> Result<(), ConnectionError> {
     let socket_dir = agent_computer_shared::types::daemon_socket_dir();
     let _ = std::fs::create_dir_all(&socket_dir);
 
+    // Create ready-pipe: pipe_fds[0] = read end, pipe_fds[1] = write end
+    let mut pipe_fds = [0i32; 2];
+    let pipe_ok = unsafe { libc::pipe(pipe_fds.as_mut_ptr()) } == 0;
+
+    let read_fd = if pipe_ok { Some(pipe_fds[0]) } else { None };
+    let write_fd = if pipe_ok { Some(pipe_fds[1]) } else { None };
+
     // Spawn daemon as background process
-    std::process::Command::new(&final_path)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
+    let mut cmd = std::process::Command::new(&final_path);
+    cmd.stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+
+    if let Some(wfd) = write_fd {
+        // Pass write fd to daemon via env var
+        cmd.env("AGENT_COMPUTER_READY_FD", wfd.to_string());
+
+        // Ensure the write fd is not close-on-exec so the child inherits it
+        unsafe {
+            let flags = libc::fcntl(wfd, libc::F_GETFD);
+            if flags >= 0 {
+                libc::fcntl(wfd, libc::F_SETFD, flags & !libc::FD_CLOEXEC);
+            }
+        }
+    }
+
+    cmd.spawn()
         .map_err(|e| {
+            // Clean up pipe fds on spawn failure
+            if let Some(rfd) = read_fd { unsafe { libc::close(rfd); } }
+            if let Some(wfd) = write_fd { unsafe { libc::close(wfd); } }
             ConnectionError::ConnectionFailed(format!(
                 "Failed to spawn daemon at {}: {}",
                 final_path.display(),
@@ -171,7 +250,12 @@ fn spawn_daemon(verbose: bool) -> Result<(), ConnectionError> {
             ))
         })?;
 
-    Ok(())
+    // Close write fd in CLI process — only daemon needs it
+    if let Some(wfd) = write_fd {
+        unsafe { libc::close(wfd); }
+    }
+
+    Ok(read_fd)
 }
 
 /// Find a binary in PATH.

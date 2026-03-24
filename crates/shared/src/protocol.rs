@@ -206,6 +206,9 @@ pub struct SnapshotData {
     pub app: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window: Option<String>,
+    /// Profiling report (only present when --verbose is used)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

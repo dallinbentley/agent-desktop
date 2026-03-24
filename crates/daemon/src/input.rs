@@ -95,11 +95,11 @@ pub fn key_press(keycode: u16, modifiers: CGEventFlags) {
             key_up.set_flags(modifiers);
 
             key_down.post(CGEventTapLocation::HID);
-            thread::sleep(Duration::from_millis(20));
+            thread::sleep(Duration::from_millis(2));
             key_up.post(CGEventTapLocation::HID);
         }
     }
-    thread::sleep(Duration::from_millis(10));
+    thread::sleep(Duration::from_millis(1));
 }
 
 /// Type a string using keyboardSetUnicodeString.
@@ -140,9 +140,9 @@ pub fn type_string(text: &str) {
                     key_up.set_string_from_utf16_unchecked(&[]);
 
                     key_down.post(CGEventTapLocation::HID);
-                    thread::sleep(Duration::from_millis(20));
+                    thread::sleep(Duration::from_millis(2));
                     key_up.post(CGEventTapLocation::HID);
-                    thread::sleep(Duration::from_millis(20));
+                    thread::sleep(Duration::from_millis(1));
                 }
             }
         }

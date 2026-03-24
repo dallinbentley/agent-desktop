@@ -80,6 +80,11 @@ fn print_data(data: &ResponseData) {
 fn print_snapshot(data: &SnapshotData) {
     // The text tree is already formatted by the daemon — print as-is
     println!("{}", data.text);
+
+    // Print profiling data to stderr when --verbose is active
+    if let Some(ref profile) = data.profile {
+        eprint!("{}", profile);
+    }
 }
 
 fn print_click(data: &ClickData) {

@@ -12,3 +12,4 @@ agent-computer-shared = { path = "../shared" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 clap = { workspace = true }
+libc = "0.2"

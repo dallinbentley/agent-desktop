@@ -109,11 +109,21 @@ pub fn handle_command(
     id: &str,
     state: &mut DaemonState,
 ) -> Response {
+    handle_command_with_options(command, args, id, state, false)
+}
+
+pub fn handle_command_with_options(
+    command: &str,
+    args: &serde_json::Value,
+    id: &str,
+    state: &mut DaemonState,
+    verbose: bool,
+) -> Response {
     let start = std::time::Instant::now();
     let elapsed = || start.elapsed().as_secs_f64() * 1000.0;
 
     match command {
-        "snapshot" => handle_snapshot(id, args, state, start),
+        "snapshot" => handle_snapshot(id, args, state, start, verbose),
         "click" => handle_click(id, args, state, start),
         "fill" => handle_fill(id, args, state, start),
         "type" => handle_type(id, args, state, start),
@@ -163,6 +173,7 @@ fn handle_snapshot(
     args: &serde_json::Value,
     state: &mut DaemonState,
     start: std::time::Instant,
+    verbose: bool,
 ) -> Response {
     let elapsed = || start.elapsed().as_secs_f64() * 1000.0;
 
@@ -211,8 +222,16 @@ fn handle_snapshot(
 
     match strategy {
         detector::SnapshotStrategy::AXOnly | detector::SnapshotStrategy::AXFallback { .. } => {
-            // AX-only snapshot
-            let (tree, ax_app_name, window_title) = ax_engine::take_snapshot(pid, depth, 3.0);
+            // AX-only snapshot (with profiling instrumentation)
+            let (tree, ax_app_name, window_title, profile) =
+                ax_engine::take_snapshot_profiled(pid, depth, 3.0);
+
+            let profile_report = if verbose {
+                Some(profile.format_report())
+            } else {
+                None
+            };
+
             let display_name = if ax_app_name != "Unknown" { ax_app_name } else { app_name };
 
             let (text, refs) = ax_engine::format_snapshot_text(
@@ -239,6 +258,7 @@ fn handle_snapshot(
                     ref_count,
                     app: display_name,
                     window: window_title,
+                    profile: profile_report,
                 }),
                 elapsed(),
             )
@@ -247,14 +267,14 @@ fn handle_snapshot(
             // CDP-only snapshot via agent-browser bridge (Electron/CEF apps)
             if !state.browser_bridge.is_available() {
                 log("agent-browser not available, falling back to AX for CDP-only app");
-                let (tree, ax_name, win_title) = ax_engine::take_snapshot(pid, depth, 3.0);
+                let (tree, ax_name, win_title, _profile) = ax_engine::take_snapshot_profiled(pid, depth, 3.0);
                 let name = if ax_name != "Unknown" { ax_name } else { app_name };
                 let (text, refs) = ax_engine::format_snapshot_text(&tree, &name, &win_title, snap_args.interactive, pid);
                 let ref_count = refs.len() as i32;
                 state.ref_map.clear();
                 for r in refs { state.ref_map.insert(r); }
                 state.last_snapshot_cdp_sourced = false;
-                return Response::ok(id.to_string(), ResponseData::Snapshot(SnapshotData { text, ref_count, app: name, window: win_title }), elapsed());
+                return Response::ok(id.to_string(), ResponseData::Snapshot(SnapshotData { text, ref_count, app: name, window: win_title, profile: None }), elapsed());
             }
 
             let session = app_name.to_lowercase().replace(' ', "-");
@@ -308,6 +328,7 @@ fn handle_snapshot(
                             ref_count,
                             app: app_name,
                             window: None,
+                            profile: None,
                         }),
                         elapsed(),
                     )
@@ -315,20 +336,20 @@ fn handle_snapshot(
                 Err(e) => {
                     // Fall back to AX
                     log(&format!("agent-browser snapshot failed, falling back to AX: {}", e));
-                    let (tree, ax_name, win_title) = ax_engine::take_snapshot(pid, depth, 3.0);
+                    let (tree, ax_name, win_title, _profile) = ax_engine::take_snapshot_profiled(pid, depth, 3.0);
                     let name = if ax_name != "Unknown" { ax_name } else { app_name };
                     let (text, refs) = ax_engine::format_snapshot_text(&tree, &name, &win_title, snap_args.interactive, pid);
                     let ref_count = refs.len() as i32;
                     state.ref_map.clear();
                     for r in refs { state.ref_map.insert(r); }
                     state.last_snapshot_cdp_sourced = false;
-                    Response::ok(id.to_string(), ResponseData::Snapshot(SnapshotData { text, ref_count, app: name, window: win_title }), elapsed())
+                    Response::ok(id.to_string(), ResponseData::Snapshot(SnapshotData { text, ref_count, app: name, window: win_title, profile: None }), elapsed())
                 }
             }
         }
         detector::SnapshotStrategy::MergedAXAndCDP { cdp_port } => {
             // Merged: AX for browser chrome (stop at AXWebArea), agent-browser for web content
-            let (tree, ax_name, win_title) = ax_engine::take_snapshot(pid, depth, 3.0);
+            let (tree, ax_name, win_title, _profile) = ax_engine::take_snapshot_profiled(pid, depth, 3.0);
             let display_name = if ax_name != "Unknown" { ax_name } else { app_name.clone() };
 
             let (ax_text, ax_refs) = ax_engine::format_snapshot_text(
@@ -403,6 +424,7 @@ fn handle_snapshot(
                     ref_count,
                     app: display_name,
                     window: win_title,
+                    profile: None,
                 }),
                 elapsed(),
             )
@@ -1361,9 +1383,14 @@ async fn handle_client(
                             .get("args")
                             .cloned()
                             .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+                        let verbose = json
+                            .get("options")
+                            .and_then(|o| o.get("verbose"))
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
 
                         let mut state = state.lock().await;
-                        handle_command(&command, &args, &id, &mut state)
+                        handle_command_with_options(&command, &args, &id, &mut state, verbose)
                     }
                     Err(_) => Response::fail(
                         "unknown".to_string(),
@@ -1420,6 +1447,18 @@ async fn main() {
     };
 
     log(&format!("Listening on {}", socket_path.display()));
+
+    // Signal readiness via ready-pipe if AGENT_COMPUTER_READY_FD is set
+    if let Ok(fd_str) = std::env::var("AGENT_COMPUTER_READY_FD") {
+        if let Ok(fd) = fd_str.parse::<i32>() {
+            let buf: [u8; 1] = [0x01];
+            unsafe {
+                libc::write(fd, buf.as_ptr() as *const libc::c_void, 1);
+                libc::close(fd);
+            }
+            log("Ready signal sent via pipe");
+        }
+    }
 
     let state = Arc::new(Mutex::new(DaemonState::new()));
 

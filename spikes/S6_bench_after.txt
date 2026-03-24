@@ -1,0 +1,24 @@
+==================================================
+ agent-computer benchmark suite
+ Iterations per command: 5
+ Binary: /Users/dallin/.cargo-shared/target/release/agent-computer
+==================================================
+
+[1;33m=== Cold Start ===[0m
+[0;36mcold start          [0m avg=  37.28 ms  min=  36.31 ms  max=  39.28 ms
+
+[1;33m=== Warm Daemon ===[0m
+[0;36mstatus              [0m avg=  10.67 ms  min=   9.99 ms  max=  11.62 ms
+[0;36mget apps            [0m avg=   6.48 ms  min=   4.95 ms  max=  11.08 ms
+[0;36mpress tab           [0m avg=  12.61 ms  min=   9.14 ms  max=  25.71 ms
+[0;36msnapshot -i         [0m avg=  21.71 ms  min=  19.22 ms  max=  26.34 ms
+
+[1;33m=== Targets ===[0m
+  status    target: <25ms
+  get apps  target: <10ms
+  press     target: <12ms
+  cold start target: <50ms
+
+==================================================
+ Benchmark complete
+==================================================

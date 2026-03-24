@@ -9,7 +9,98 @@ use core_foundation::array::{CFArray, CFArrayRef};
 use core_foundation::base::{CFTypeID, CFTypeRef, TCFType};
 use core_foundation::string::{CFString, CFStringRef};
 use std::ffi::c_void;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
+// ============================================================================
+// MARK: - Snapshot Profiling
+// ============================================================================
+
+/// Per-depth-level statistics collected during tree traversal.
+#[derive(Debug, Clone)]
+pub struct DepthStats {
+    pub depth: usize,
+    pub duration: Duration,
+    pub element_count: usize,
+}
+
+/// Profiling data collected during a snapshot.
+#[derive(Debug, Clone)]
+pub struct SnapshotProfile {
+    /// Per-depth-level timing and element counts.
+    pub depth_stats: Vec<DepthStats>,
+    /// Total number of AX attribute queries made.
+    pub total_ax_queries: usize,
+    /// Total number of elements visited.
+    pub total_elements: usize,
+    /// Total wall-clock duration of the snapshot.
+    pub total_duration: Duration,
+}
+
+impl SnapshotProfile {
+    fn new() -> Self {
+        Self {
+            depth_stats: Vec::new(),
+            total_ax_queries: 0,
+            total_elements: 0,
+            total_duration: Duration::ZERO,
+        }
+    }
+
+    /// Ensure the depth_stats vec has an entry for this depth.
+    fn ensure_depth(&mut self, depth: usize) {
+        while self.depth_stats.len() <= depth {
+            let d = self.depth_stats.len();
+            self.depth_stats.push(DepthStats {
+                depth: d,
+                duration: Duration::ZERO,
+                element_count: 0,
+            });
+        }
+    }
+
+    /// Record time and element for a given depth.
+    fn record(&mut self, depth: usize, duration: Duration) {
+        self.ensure_depth(depth);
+        self.depth_stats[depth].duration += duration;
+        self.depth_stats[depth].element_count += 1;
+        self.total_elements += 1;
+    }
+
+    /// Increment the AX attribute query counter.
+    fn count_queries(&mut self, n: usize) {
+        self.total_ax_queries += n;
+    }
+
+    /// Format profiling data for stderr output.
+    pub fn format_report(&self) -> String {
+        let mut out = String::new();
+        out.push_str("\n[snapshot profiling]\n");
+        out.push_str(&format!(
+            "  total: {:.1}ms | {} elements | {} AX queries\n",
+            self.total_duration.as_secs_f64() * 1000.0,
+            self.total_elements,
+            self.total_ax_queries,
+        ));
+        out.push_str("  per-depth breakdown:\n");
+        for ds in &self.depth_stats {
+            if ds.element_count > 0 {
+                let avg_us = if ds.element_count > 0 {
+                    ds.duration.as_micros() as f64 / ds.element_count as f64
+                } else {
+                    0.0
+                };
+                out.push_str(&format!(
+                    "    depth {:2}: {:6.1}ms | {:5} elements | {:.0}µs/elem\n",
+                    ds.depth,
+                    ds.duration.as_secs_f64() * 1000.0,
+                    ds.element_count,
+                    avg_us,
+                ));
+            }
+        }
+        out
+    }
+}
 
 // ============================================================================
 // MARK: - Raw FFI to ApplicationServices
@@ -109,6 +200,18 @@ fn k_ax_press_action() -> CFString {
 
 /// Safely get a string attribute from an AX element.
 fn safe_get_string(element: AXUIElementRef, attr: &CFString) -> Option<String> {
+    safe_get_string_profiled(element, attr, None)
+}
+
+/// Safely get a string attribute, optionally counting the query.
+fn safe_get_string_profiled(
+    element: AXUIElementRef,
+    attr: &CFString,
+    profile: Option<&mut SnapshotProfile>,
+) -> Option<String> {
+    if let Some(p) = profile {
+        p.count_queries(1);
+    }
     unsafe {
         let mut value: CFTypeRef = std::ptr::null_mut();
         let err = AXUIElementCopyAttributeValue(
@@ -131,8 +234,20 @@ fn safe_get_string(element: AXUIElementRef, attr: &CFString) -> Option<String> {
     }
 }
 
+/// Safely get the frame (position + size) of an AX element, with optional profiling.
+fn safe_get_frame_profiled(element: AXUIElementRef, profile: Option<&mut SnapshotProfile>) -> Option<Rect> {
+    if let Some(p) = profile {
+        p.count_queries(2); // position + size
+    }
+    safe_get_frame_inner(element)
+}
+
 /// Safely get the frame (position + size) of an AX element.
 fn safe_get_frame(element: AXUIElementRef) -> Option<Rect> {
+    safe_get_frame_inner(element)
+}
+
+fn safe_get_frame_inner(element: AXUIElementRef) -> Option<Rect> {
     unsafe {
         let mut pos_value: CFTypeRef = std::ptr::null_mut();
         let mut size_value: CFTypeRef = std::ptr::null_mut();
@@ -214,6 +329,14 @@ fn safe_get_frame(element: AXUIElementRef) -> Option<Rect> {
     }
 }
 
+/// Get action names, with optional profiling.
+fn safe_get_actions_profiled(element: AXUIElementRef, profile: Option<&mut SnapshotProfile>) -> Vec<String> {
+    if let Some(p) = profile {
+        p.count_queries(1);
+    }
+    safe_get_actions(element)
+}
+
 /// Get action names for an AX element.
 fn safe_get_actions(element: AXUIElementRef) -> Vec<String> {
     unsafe {
@@ -236,6 +359,14 @@ fn safe_get_actions(element: AXUIElementRef) -> Vec<String> {
         CFRelease(names as CFTypeRef);
         result
     }
+}
+
+/// Get children, with optional profiling.
+fn safe_get_children_profiled(element: AXUIElementRef, profile: Option<&mut SnapshotProfile>) -> Vec<AXUIElementRef> {
+    if let Some(p) = profile {
+        p.count_queries(1);
+    }
+    safe_get_children(element)
 }
 
 /// Get children of an AX element (returns raw AXUIElementRefs).
@@ -270,6 +401,17 @@ fn safe_get_children(element: AXUIElementRef) -> Vec<AXUIElementRef> {
         CFRelease(value);
         result
     }
+}
+
+/// Batch fetch with optional profiling.
+fn batch_get_attributes_profiled(
+    element: AXUIElementRef,
+    profile: Option<&mut SnapshotProfile>,
+) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+    if let Some(p) = profile {
+        p.count_queries(4); // role, title, description, value
+    }
+    batch_get_attributes(element)
 }
 
 /// Batch fetch role, title, description, value using AXUIElementCopyMultipleAttributeValues.
@@ -357,13 +499,14 @@ pub struct AXNode {
 // MARK: - AX Tree Traversal
 // ============================================================================
 
-/// Recursively traverse the AX tree starting from an element.
-fn traverse_ax_tree(
+/// Recursively traverse the AX tree with optional profiling instrumentation.
+fn traverse_ax_tree_profiled(
     element: AXUIElementRef,
     depth: usize,
     max_depth: usize,
     deadline: Instant,
     index_in_parent: usize,
+    mut profile: Option<&mut SnapshotProfile>,
 ) -> Option<AXNode> {
     // Check timeout
     if Instant::now() > deadline {
@@ -375,10 +518,24 @@ fn traverse_ax_tree(
         return None;
     }
 
-    let (role_opt, title, description, value) = batch_get_attributes(element);
+    let node_start = Instant::now();
+
+    let (role_opt, title, description, value) = if let Some(ref mut p) = profile.as_deref_mut() {
+        batch_get_attributes_profiled(element, Some(*p))
+    } else {
+        batch_get_attributes(element)
+    };
     let role = role_opt.unwrap_or_else(|| "AXUnknown".to_string());
-    let frame = safe_get_frame(element);
-    let actions = safe_get_actions(element);
+    let frame = if let Some(ref mut p) = profile.as_deref_mut() {
+        safe_get_frame_profiled(element, Some(*p))
+    } else {
+        safe_get_frame(element)
+    };
+    let actions = if let Some(ref mut p) = profile.as_deref_mut() {
+        safe_get_actions_profiled(element, Some(*p))
+    } else {
+        safe_get_actions(element)
+    };
     let is_interactive = INTERACTIVE_ROLES.contains(role.as_str());
 
     let segment = PathSegment {
@@ -387,24 +544,40 @@ fn traverse_ax_tree(
     };
 
     // Get children and recurse
-    let child_elements = safe_get_children(element);
+    let child_elements = if let Some(ref mut p) = profile.as_deref_mut() {
+        safe_get_children_profiled(element, Some(*p))
+    } else {
+        safe_get_children(element)
+    };
     let mut child_nodes: Vec<AXNode> = Vec::new();
     let mut child_role_counts: std::collections::HashMap<String, usize> =
         std::collections::HashMap::new();
 
+    // Record this node's own time (before recursing into children)
+    let self_duration = node_start.elapsed();
+    if let Some(ref mut p) = profile.as_deref_mut() {
+        p.record(depth, self_duration);
+    }
+
     for child in &child_elements {
         // Get child role for path indexing
-        let child_role = safe_get_string(*child, &k_ax_role()).unwrap_or_else(|| "AXUnknown".to_string());
+        let child_role = if let Some(ref mut p) = profile.as_deref_mut() {
+            safe_get_string_profiled(*child, &k_ax_role(), Some(*p))
+                .unwrap_or_else(|| "AXUnknown".to_string())
+        } else {
+            safe_get_string(*child, &k_ax_role()).unwrap_or_else(|| "AXUnknown".to_string())
+        };
         let child_idx = child_role_counts.entry(child_role).or_insert(0);
         let current_idx = *child_idx;
         *child_idx += 1;
 
-        if let Some(child_node) = traverse_ax_tree(
+        if let Some(child_node) = traverse_ax_tree_profiled(
             *child,
             depth + 1,
             max_depth,
             deadline,
             current_idx,
+            profile.as_deref_mut(),
         ) {
             child_nodes.push(child_node);
         }
@@ -442,10 +615,25 @@ pub fn take_snapshot(
     depth: u32,
     timeout_secs: f64,
 ) -> (Vec<AXNode>, String, Option<String>) {
+    let (nodes, name, title, _profile) = take_snapshot_profiled(pid, depth, timeout_secs);
+    (nodes, name, title)
+}
+
+/// Take a snapshot with profiling instrumentation.
+/// Returns (tree_nodes, app_name, window_title, profile).
+pub fn take_snapshot_profiled(
+    pid: i32,
+    depth: u32,
+    timeout_secs: f64,
+) -> (Vec<AXNode>, String, Option<String>, SnapshotProfile) {
+    let snapshot_start = Instant::now();
+    let mut profile = SnapshotProfile::new();
+
     let app_element = unsafe { AXUIElementCreateApplication(pid) };
     let deadline = Instant::now() + std::time::Duration::from_secs_f64(timeout_secs);
 
-    // Get app name
+    // Get app name (count as 1 AX query)
+    profile.count_queries(1);
     let app_name = safe_get_string(app_element, &k_ax_title()).unwrap_or_else(|| "Unknown".to_string());
 
     // Get windows
@@ -454,6 +642,7 @@ pub fn take_snapshot(
 
     unsafe {
         let mut windows_value: CFTypeRef = std::ptr::null_mut();
+        profile.count_queries(1); // kAXWindows query
         let err = AXUIElementCopyAttributeValue(
             app_element,
             k_ax_windows().as_concrete_TypeRef(),
@@ -472,17 +661,19 @@ pub fn take_snapshot(
                         continue;
                     }
 
+                    profile.count_queries(1); // window title query
                     let win_title = safe_get_string(window, &k_ax_title());
                     if win_idx == 0 {
                         window_title = win_title;
                     }
 
-                    if let Some(node) = traverse_ax_tree(
+                    if let Some(node) = traverse_ax_tree_profiled(
                         window,
                         0,
                         depth as usize,
                         deadline,
                         win_idx as usize,
+                        Some(&mut profile),
                     ) {
                         root_nodes.push(node);
                     }
@@ -491,9 +682,14 @@ pub fn take_snapshot(
             CFRelease(windows_value);
         } else {
             // No windows — traverse the app element itself
-            if let Some(node) =
-                traverse_ax_tree(app_element, 0, depth as usize, deadline, 0)
-            {
+            if let Some(node) = traverse_ax_tree_profiled(
+                app_element,
+                0,
+                depth as usize,
+                deadline,
+                0,
+                Some(&mut profile),
+            ) {
                 root_nodes.push(node);
             }
         }
@@ -501,7 +697,8 @@ pub fn take_snapshot(
         CFRelease(app_element as CFTypeRef);
     }
 
-    (root_nodes, app_name, window_title)
+    profile.total_duration = snapshot_start.elapsed();
+    (root_nodes, app_name, window_title, profile)
 }
 
 // ============================================================================
@@ -944,6 +1141,36 @@ fn get_frontmost_via_cgwindowlist() -> Option<(String, i32)> {
 /// Check if accessibility is trusted (permission granted).
 pub fn is_process_trusted() -> bool {
     unsafe { AXIsProcessTrusted() }
+}
+
+/// Get the focused window title for a given PID using AX APIs.
+/// Uses AXUIElement → kAXFocusedWindowAttribute → kAXTitleAttribute.
+pub fn get_window_title_for_pid(pid: i32) -> Option<String> {
+    unsafe {
+        let app_element = AXUIElementCreateApplication(pid);
+
+        // Get the focused window attribute
+        let focused_window_attr = CFString::new("AXFocusedWindow");
+        let mut window_ref: CFTypeRef = std::ptr::null_mut();
+        let err = AXUIElementCopyAttributeValue(
+            app_element,
+            focused_window_attr.as_concrete_TypeRef(),
+            &mut window_ref,
+        );
+
+        if err != K_AX_ERROR_SUCCESS || window_ref.is_null() {
+            CFRelease(app_element as CFTypeRef);
+            return None;
+        }
+
+        // Get the title of the focused window
+        let title = safe_get_string(window_ref as AXUIElementRef, &k_ax_title());
+
+        CFRelease(window_ref);
+        CFRelease(app_element as CFTypeRef);
+
+        title.filter(|t| !t.is_empty())
+    }
 }
 
 // ============================================================================
