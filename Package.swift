@@ -39,5 +39,6 @@ let package = Package(
         .executableTarget(name: "SpikeCGEvent", path: "Sources/Spikes/CGEvent"),
         .executableTarget(name: "SpikeScreenshot", path: "Sources/Spikes/Screenshot"),
         .executableTarget(name: "SpikeDaemon", path: "Sources/Spikes/Daemon"),
+        .executableTarget(name: "SpikeAXActions", path: "Sources/Spikes/AXActions"),
     ]
 )
