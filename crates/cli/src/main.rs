@@ -189,6 +189,9 @@ enum Commands {
 
     /// Show daemon status and permissions
     Status,
+
+    /// Download and install agent-browser binary + Chrome for Testing
+    InstallBrowser,
 }
 
 // MARK: - Helpers
@@ -461,6 +464,11 @@ fn main() {
         Commands::Status => {
             ("status", serde_json::Value::Object(serde_json::Map::new()))
         }
+        Commands::InstallBrowser => {
+            // Handle locally — no daemon needed
+            install_browser_command();
+            return;
+        }
     };
 
     // Build request
@@ -489,6 +497,178 @@ fn main() {
                 Some("Is the daemon running? Try 'agent-computer status'."),
             );
             std::process::exit(1);
+        }
+    }
+}
+
+/// Install agent-browser binary and Chrome for Testing.
+/// This is a local command that doesn't require the daemon.
+fn install_browser_command() {
+    use std::io::Read;
+    use std::process::Command;
+
+    const AGENT_BROWSER_VERSION: &str = "0.22.1";
+
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => {
+            eprintln!("Error: Cannot determine home directory.");
+            std::process::exit(1);
+        }
+    };
+
+    let bin_dir = home.join(".agent-computer/bin");
+    let target_path = bin_dir.join("agent-browser");
+
+    // Check if already installed
+    if target_path.exists() {
+        eprintln!("agent-browser already installed at {}", target_path.display());
+        eprintln!("Running 'agent-browser install' to ensure Chrome for Testing is set up...");
+        let status = Command::new(&target_path)
+            .arg("install")
+            .status();
+        match status {
+            Ok(s) if s.success() => {
+                eprintln!("✓ Chrome for Testing is ready.");
+                return;
+            }
+            Ok(s) => {
+                eprintln!("Warning: 'agent-browser install' exited with {}", s);
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to run 'agent-browser install': {}", e);
+            }
+        }
+        return;
+    }
+
+    // Detect platform
+    let os = if cfg!(target_os = "macos") {
+        "darwin"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else {
+        eprintln!("Error: Unsupported OS for agent-browser binary.");
+        std::process::exit(1);
+    };
+
+    let arch = if cfg!(target_arch = "aarch64") {
+        "arm64"
+    } else if cfg!(target_arch = "x86_64") {
+        "x64"
+    } else {
+        eprintln!("Error: Unsupported architecture for agent-browser binary.");
+        std::process::exit(1);
+    };
+
+    let binary_name = format!("agent-browser-{}-{}", os, arch);
+    eprintln!("Installing agent-browser v{} ({}-{})...", AGENT_BROWSER_VERSION, os, arch);
+
+    // Create directories
+    if let Err(e) = std::fs::create_dir_all(&bin_dir) {
+        eprintln!("Error: Failed to create {}: {}", bin_dir.display(), e);
+        std::process::exit(1);
+    }
+
+    // Download
+    let url = format!(
+        "https://registry.npmjs.org/agent-browser/-/agent-browser-{}.tgz",
+        AGENT_BROWSER_VERSION
+    );
+    eprintln!("Downloading from {}...", url);
+
+    let tmp_dir = bin_dir.join(".download-tmp");
+    if tmp_dir.exists() {
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+    }
+    std::fs::create_dir_all(&tmp_dir).unwrap();
+    let tgz_path = tmp_dir.join("agent-browser.tgz");
+
+    let response = match ureq::get(&url).call() {
+        Ok(r) => r,
+        Err(e) => {
+            let _ = std::fs::remove_dir_all(&tmp_dir);
+            eprintln!("Error: Download failed: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let mut body = Vec::new();
+    if let Err(e) = response.into_reader().read_to_end(&mut body) {
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        eprintln!("Error: Failed to read response: {}", e);
+        std::process::exit(1);
+    }
+
+    if let Err(e) = std::fs::write(&tgz_path, &body) {
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        eprintln!("Error: Failed to save download: {}", e);
+        std::process::exit(1);
+    }
+
+    eprintln!("Downloaded {} bytes, extracting...", body.len());
+
+    // Extract
+    let tar_result = Command::new("tar")
+        .arg("xzf")
+        .arg(tgz_path.to_str().unwrap())
+        .arg("-C")
+        .arg(tmp_dir.to_str().unwrap())
+        .output();
+
+    match tar_result {
+        Ok(output) if !output.status.success() => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let _ = std::fs::remove_dir_all(&tmp_dir);
+            eprintln!("Error: tar extraction failed: {}", stderr);
+            std::process::exit(1);
+        }
+        Err(e) => {
+            let _ = std::fs::remove_dir_all(&tmp_dir);
+            eprintln!("Error: Failed to run tar: {}", e);
+            std::process::exit(1);
+        }
+        _ => {}
+    }
+
+    let extracted = tmp_dir.join("package/bin").join(&binary_name);
+    if !extracted.exists() {
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        eprintln!("Error: Binary '{}' not found in npm package.", binary_name);
+        std::process::exit(1);
+    }
+
+    if let Err(e) = std::fs::copy(&extracted, &target_path) {
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        eprintln!("Error: Failed to copy binary: {}", e);
+        std::process::exit(1);
+    }
+
+    // chmod +x
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(&target_path) {
+            let mut perms = meta.permissions();
+            perms.set_mode(0o755);
+            let _ = std::fs::set_permissions(&target_path, perms);
+        }
+    }
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    eprintln!("✓ Installed agent-browser at {}", target_path.display());
+
+    // Run agent-browser install for Chrome for Testing
+    eprintln!("Running 'agent-browser install' to download Chrome for Testing...");
+    match Command::new(&target_path).arg("install").status() {
+        Ok(s) if s.success() => {
+            eprintln!("✓ Chrome for Testing installed. Browser automation is ready!");
+        }
+        Ok(s) => {
+            eprintln!("Warning: 'agent-browser install' exited with {}", s);
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to run 'agent-browser install': {}", e);
         }
     }
 }

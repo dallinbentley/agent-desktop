@@ -103,16 +103,16 @@ fn log(msg: &str) {
 // MARK: - Command Dispatch (Task 11.1)
 
 /// Central dispatch function — routes commands to real engine implementations.
-pub fn handle_command(
+pub async fn handle_command(
     command: &str,
     args: &serde_json::Value,
     id: &str,
     state: &mut DaemonState,
 ) -> Response {
-    handle_command_with_options(command, args, id, state, false)
+    handle_command_with_options(command, args, id, state, false).await
 }
 
-pub fn handle_command_with_options(
+pub async fn handle_command_with_options(
     command: &str,
     args: &serde_json::Value,
     id: &str,
@@ -123,13 +123,13 @@ pub fn handle_command_with_options(
     let elapsed = || start.elapsed().as_secs_f64() * 1000.0;
 
     match command {
-        "snapshot" => handle_snapshot(id, args, state, start, verbose),
-        "click" => handle_click(id, args, state, start),
-        "fill" => handle_fill(id, args, state, start),
-        "type" => handle_type(id, args, state, start),
-        "press" => handle_press(id, args, state, start),
-        "scroll" => handle_scroll(id, args, state, start),
-        "wait" => handle_wait(id, args, state, start),
+        "snapshot" => handle_snapshot(id, args, state, start, verbose).await,
+        "click" => handle_click(id, args, state, start).await,
+        "fill" => handle_fill(id, args, state, start).await,
+        "type" => handle_type(id, args, state, start).await,
+        "press" => handle_press(id, args, state, start).await,
+        "scroll" => handle_scroll(id, args, state, start).await,
+        "wait" => handle_wait(id, args, state, start).await,
         "screenshot" => handle_screenshot(id, args, start),
         "open" => {
             let open_args: OpenArgs = match serde_json::from_value(args.clone()) {
@@ -142,7 +142,7 @@ pub fn handle_command_with_options(
                     );
                 }
             };
-            app::handle_open(id, &open_args, state, start)
+            app::handle_open(id, &open_args, state, start).await
         }
         "get" => {
             let get_args: GetArgs = match serde_json::from_value(args.clone()) {
@@ -155,7 +155,7 @@ pub fn handle_command_with_options(
                     );
                 }
             };
-            app::handle_get(id, &get_args, state, start)
+            app::handle_get(id, &get_args, state, start).await
         }
         "status" => app::handle_status(id, state, start),
         _ => Response::fail(
@@ -168,7 +168,7 @@ pub fn handle_command_with_options(
 
 // MARK: - Snapshot Command (detect → route → AX/CDP/merged → format → respond)
 
-fn handle_snapshot(
+async fn handle_snapshot(
     id: &str,
     args: &serde_json::Value,
     state: &mut DaemonState,
@@ -278,14 +278,14 @@ fn handle_snapshot(
             }
 
             let session = app_name.to_lowercase().replace(' ', "-");
-            match state.browser_bridge.snapshot(&session, cdp_port, snap_args.interactive, snap_args.selector.as_deref()) {
-                Ok(parsed_elements) => {
-                    // Build ElementRefs from parsed agent-browser output
+            match state.browser_bridge.snapshot(&session, cdp_port, snap_args.interactive, snap_args.selector.as_deref()).await {
+                Ok(snapshot_result) => {
+                    // Build ElementRefs from JSON snapshot result
                     let mut refs = Vec::new();
                     let mut lines = Vec::new();
                     let mut counter: usize = 1;
 
-                    for elem in &parsed_elements {
+                    for elem in &snapshot_result.elements {
                         let ref_id = format!("e{counter}");
                         let line = if let Some(ref lbl) = elem.label {
                             format!("  @{ref_id} {} \"{}\"", elem.role, lbl)
@@ -313,7 +313,12 @@ fn handle_snapshot(
                     }
 
                     let ref_count = refs.len() as i32;
-                    let text = format!("[{}]\n{}", app_name, lines.join("\n"));
+                    // Use pre-formatted snapshot text from JSON if available, otherwise build from refs
+                    let text = if let Some(ref snap_text) = snapshot_result.snapshot_text {
+                        format!("[{}]\n{}", app_name, snap_text)
+                    } else {
+                        format!("[{}]\n{}", app_name, lines.join("\n"))
+                    };
 
                     state.ref_map.clear();
                     for r in refs { state.ref_map.insert(r); }
@@ -359,24 +364,27 @@ fn handle_snapshot(
             // Try to get web content via agent-browser
             let session = app_name.to_lowercase().replace(' ', "-");
             let (merged_text, all_refs, cdp_sourced) = if state.browser_bridge.is_available() {
-                match state.browser_bridge.snapshot(&session, cdp_port, snap_args.interactive, snap_args.selector.as_deref()) {
-                    Ok(parsed_elements) => {
+                match state.browser_bridge.snapshot(&session, cdp_port, snap_args.interactive, snap_args.selector.as_deref()).await {
+                    Ok(snapshot_result) => {
                         let mut text = ax_text;
                         let ax_count = ax_refs.len();
                         let mut all = ax_refs;
 
-                        if !parsed_elements.is_empty() {
-                            text.push_str("  --- web content ---\n");
+                        if !snapshot_result.elements.is_empty() {
+                            // Use pre-formatted snapshot text if available
+                            if let Some(ref snap_text) = snapshot_result.snapshot_text {
+                                text.push_str("  --- web content ---\n");
+                                text.push_str(snap_text);
+                                if !snap_text.ends_with('\n') {
+                                    text.push('\n');
+                                }
+                            } else {
+                                text.push_str("  --- web content ---\n");
+                            }
+
                             let mut counter = ax_count + 1;
-                            for elem in &parsed_elements {
+                            for elem in &snapshot_result.elements {
                                 let ref_id = format!("e{counter}");
-                                let line = if let Some(ref lbl) = elem.label {
-                                    format!("  @{ref_id} {} \"{}\"", elem.role, lbl)
-                                } else {
-                                    format!("  @{ref_id} {}", elem.role)
-                                };
-                                text.push_str(&line);
-                                text.push('\n');
 
                                 all.push(ElementRef {
                                     id: ref_id,
@@ -445,7 +453,7 @@ fn handle_snapshot(
 
 // MARK: - Click Command (resolve ref → dispatch to correct engine) (Task 11.1 + 11.2)
 
-fn handle_click(
+async fn handle_click(
     id: &str,
     args: &serde_json::Value,
     state: &mut DaemonState,
@@ -600,7 +608,7 @@ fn handle_click(
             element,
         } => {
             // Agent-browser click — delegate to bridge
-            match state.browser_bridge.click(&session, cdp_port, &ab_ref) {
+            match state.browser_bridge.click(&session, cdp_port, &ab_ref).await {
                 Ok(_) => {
                     // Task 4.1: Post-click delay for CDP clicks (skip if --no-wait)
                     if !click_args.no_wait {
@@ -610,9 +618,9 @@ fn handle_click(
                             // For links, use agent-browser wait to let SPA routers update
                             let _ = state.browser_bridge.execute(
                                 &session, cdp_port, &["wait", "500"]
-                            );
+                            ).await;
                         } else {
-                            std::thread::sleep(std::time::Duration::from_millis(500));
+                            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                         }
                     }
 
@@ -657,7 +665,7 @@ fn handle_click(
 
 // MARK: - Fill Command (Task 11.2: AX set_value → selection-replace → CGEvent Cmd+A+type)
 
-fn handle_fill(
+async fn handle_fill(
     id: &str,
     args: &serde_json::Value,
     state: &mut DaemonState,
@@ -685,7 +693,7 @@ fn handle_fill(
             let ab_ref = state.ref_map.resolve(ref_id)
                 .and_then(|e| e.ab_ref.clone())
                 .unwrap_or_else(|| ref_id.clone());
-            match state.browser_bridge.fill(&session, cdp_port, &ab_ref, &fill_args.text) {
+            match state.browser_bridge.fill(&session, cdp_port, &ab_ref, &fill_args.text).await {
                 Ok(_) => {
                     return Response::ok(
                         id.to_string(),
@@ -781,7 +789,7 @@ fn handle_fill(
             ..
         } => {
             // Agent-browser fill — delegate to bridge
-            match state.browser_bridge.fill(&session, cdp_port, &ab_ref, &fill_args.text) {
+            match state.browser_bridge.fill(&session, cdp_port, &ab_ref, &fill_args.text).await {
                 Ok(_) => {
                     Response::ok(
                         id.to_string(),
@@ -817,7 +825,7 @@ fn handle_fill(
 
 // MARK: - Type Command
 
-fn handle_type(
+async fn handle_type(
     id: &str,
     args: &serde_json::Value,
     state: &mut DaemonState,
@@ -844,7 +852,7 @@ fn handle_type(
                 let ab_ref = state.ref_map.resolve(ref_id)
                     .and_then(|e| e.ab_ref.clone())
                     .unwrap_or_else(|| ref_id.clone());
-                match state.browser_bridge.type_text(&session, cdp_port, &ab_ref, &type_args.text) {
+                match state.browser_bridge.type_text(&session, cdp_port, &ab_ref, &type_args.text).await {
                     Ok(_) => {
                         return Response::ok(
                             id.to_string(),
@@ -895,7 +903,7 @@ fn handle_type(
                 ..
             } => {
                 // Agent-browser type — delegate to bridge
-                if let Err(e) = state.browser_bridge.type_text(&session, cdp_port, &ab_ref, &type_args.text) {
+                if let Err(e) = state.browser_bridge.type_text(&session, cdp_port, &ab_ref, &type_args.text).await {
                     log(&format!("agent-browser type_text failed: {}", e));
                 }
             }
@@ -922,7 +930,7 @@ fn handle_type(
 
 // MARK: - Press Command
 
-fn handle_press(
+async fn handle_press(
     id: &str,
     args: &serde_json::Value,
     state: &mut DaemonState,
@@ -945,7 +953,7 @@ fn handle_press(
     if let Some(ref app_name) = press_args.app {
         if let Some(cdp_port) = state.get_cdp_port_for_app(app_name) {
             let session = app_name.to_lowercase().replace(' ', "-");
-            match state.browser_bridge.press(&session, cdp_port, &press_args.key) {
+            match state.browser_bridge.press(&session, cdp_port, &press_args.key).await {
                 Ok(()) => {
                     return Response::ok(
                         id.to_string(),
@@ -967,7 +975,7 @@ fn handle_press(
     // If last snapshot was CDP-sourced, delegate to agent-browser for headless key press
     if state.last_snapshot_cdp_sourced {
         if let (Some(ref session), Some(cdp_port)) = (&state.last_cdp_session, state.last_cdp_port) {
-            match state.browser_bridge.press(session, cdp_port, &press_args.key) {
+            match state.browser_bridge.press(session, cdp_port, &press_args.key).await {
                 Ok(()) => {
                     return Response::ok(
                         id.to_string(),
@@ -1016,7 +1024,7 @@ fn handle_press(
 
 // MARK: - Scroll Command
 
-fn handle_scroll(
+async fn handle_scroll(
     id: &str,
     args: &serde_json::Value,
     state: &mut DaemonState,
@@ -1041,7 +1049,7 @@ fn handle_scroll(
     if let Some(ref app_name) = scroll_args.app {
         if let Some(cdp_port) = state.get_cdp_port_for_app(app_name) {
             let session = app_name.to_lowercase().replace(' ', "-");
-            match state.browser_bridge.scroll(&session, cdp_port, &scroll_args.direction, amount) {
+            match state.browser_bridge.scroll(&session, cdp_port, &scroll_args.direction, amount).await {
                 Ok(()) => {
                     return Response::ok(
                         id.to_string(),
@@ -1063,7 +1071,7 @@ fn handle_scroll(
     // If last snapshot was CDP-sourced, delegate to agent-browser for headless scroll
     if state.last_snapshot_cdp_sourced {
         if let (Some(ref session), Some(cdp_port)) = (&state.last_cdp_session, state.last_cdp_port) {
-            match state.browser_bridge.scroll(session, cdp_port, &scroll_args.direction, amount) {
+            match state.browser_bridge.scroll(session, cdp_port, &scroll_args.direction, amount).await {
                 Ok(()) => {
                     return Response::ok(
                         id.to_string(),
@@ -1096,7 +1104,7 @@ fn handle_scroll(
 
 // MARK: - Wait Command (Task 3.3)
 
-fn handle_wait(
+async fn handle_wait(
     id: &str,
     args: &serde_json::Value,
     state: &mut DaemonState,
@@ -1141,7 +1149,7 @@ fn handle_wait(
         }
 
         if let (Some(session), Some(port)) = (&cdp_session, cdp_port) {
-            match state.browser_bridge.wait(session, port, &["--load", load_state]) {
+            match state.browser_bridge.wait(session, port, &["--load", load_state]).await {
                 Ok(_) => {
                     let waited_ms = start.elapsed().as_millis() as u64;
                     return Response::ok(
@@ -1171,7 +1179,7 @@ fn handle_wait(
     if let Some(ref arg) = wait_args.ref_or_ms {
         // Check if numeric → sleep
         if let Ok(ms) = arg.parse::<u64>() {
-            std::thread::sleep(std::time::Duration::from_millis(ms));
+            tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
             return Response::ok(
                 id.to_string(),
                 ResponseData::Wait(WaitData { waited_ms: ms }),
@@ -1184,7 +1192,7 @@ fn handle_wait(
             // If we have CDP context, delegate to agent-browser wait
             if let (Some(session), Some(port)) = (&cdp_session, cdp_port) {
                 let ref_arg = format!("@{}", ref_id);
-                match state.browser_bridge.wait(session, port, &[&ref_arg]) {
+                match state.browser_bridge.wait(session, port, &[&ref_arg]).await {
                     Ok(_) => {
                         let waited_ms = start.elapsed().as_millis() as u64;
                         return Response::ok(
@@ -1213,7 +1221,7 @@ fn handle_wait(
                             elapsed(),
                         );
                     }
-                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 }
                 return Response::fail(
                     id.to_string(),
@@ -1390,7 +1398,7 @@ async fn handle_client(
                             .unwrap_or(false);
 
                         let mut state = state.lock().await;
-                        handle_command_with_options(&command, &args, &id, &mut state, verbose)
+                        handle_command_with_options(&command, &args, &id, &mut state, verbose).await
                     }
                     Err(_) => Response::fail(
                         "unknown".to_string(),
@@ -1501,7 +1509,7 @@ async fn main() {
         let session_count = state.browser_bridge.active_sessions.len();
         if session_count > 0 {
             log(&format!("Closing {} agent-browser session(s)...", session_count));
-            state.browser_bridge.close_all();
+            state.browser_bridge.close_all().await;
             log("All agent-browser sessions closed");
         }
     }

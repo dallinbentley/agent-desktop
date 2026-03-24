@@ -4,6 +4,16 @@ agent-computer can use Chrome DevTools Protocol (CDP) for enhanced inspection an
 
 **Related**: [commands.md](commands.md) for full command reference, [snapshot-refs.md](snapshot-refs.md) for ref system details.
 
+## Prerequisites
+
+CDP mode requires [agent-browser](https://github.com/vercel-labs/agent-browser) installed as a subprocess dependency:
+
+```bash
+npm install -g agent-browser
+```
+
+You **never call agent-browser directly**. The daemon uses it internally to communicate with Electron apps via CDP. All commands go through `agent-computer` — the daemon handles routing transparently. If agent-browser is not installed, the daemon falls back to native macOS accessibility (which works but provides less detail for web content inside Electron apps).
+
 ## What is CDP Mode?
 
 Many popular desktop apps are built with Electron (VS Code, Slack, Discord, Spotify, Notion, etc.). These apps run Chromium internally. CDP mode connects to the app's Chromium instance, enabling:
@@ -26,8 +36,9 @@ agent-computer snapshot -i
 
 The `--with-cdp` flag:
 1. Launches the app with remote debugging enabled on an available port
-2. Connects the daemon to the app's CDP endpoint
-3. Enhances snapshots with web-level detail
+2. The daemon connects to the CDP endpoint via agent-browser (subprocess)
+3. Snapshots merge native AX (window chrome, menus) with web content (CDP)
+4. All refs are unified — you interact with them identically
 
 ### Snapshot with CSS Selector Scope
 
@@ -58,28 +69,33 @@ agent-computer open "Slack" --with-cdp
          │
          ▼
 ┌─────────────────────┐
-│  Daemon detects      │
-│  Electron/CEF app    │
-│  Launches with       │
-│  --remote-debugging  │
-│  -port=<port>        │
-└─────────┬───────────┘
+│  Daemon detects       │
+│  Electron/CEF app     │
+│  Launches with        │
+│  --remote-debugging   │
+│  -port=<port>         │
+└─────────┬─────────────┘
           │
           ▼
-┌─────────────────────┐
-│  CDP connection      │
-│  established via     │
-│  WebSocket           │
-│  Refs route through  │
-│  CDP for interaction │
-└─────────────────────┘
+┌──────────────────────────────┐
+│  Daemon's BrowserBridge       │
+│  shells out to agent-browser  │
+│  (subprocess) with            │
+│  --session <name> --cdp <port>│
+│                               │
+│  Snapshot → parsed elements   │
+│  Click/Fill → delegated       │
+│  Press/Scroll → delegated     │
+└──────────────────────────────┘
 ```
 
 When CDP is active:
-- **Snapshots** use the web accessibility tree (richer than native AX)
-- **Clicks** can use CDP-based element clicking (more reliable)
-- **Refs** carry CDP metadata for routing (`cdp_node_id`, `cdp_port`)
-- **Press/scroll** can be delegated to CDP when appropriate
+- The daemon calls `agent-browser --session <name> --cdp <port> snapshot -i` and parses the output
+- **Snapshots** merge native AX (title bar, menus) with CDP web content — unified into one ref map
+- **Clicks** on CDP-sourced refs are delegated to agent-browser (more reliable than coordinate CGEvent)
+- **Refs** carry metadata tracking their source (`AX`, `CDP`, or `Coordinate`) — the daemon routes automatically
+- **Press/scroll** on CDP-sourced content is delegated to agent-browser for accuracy
+- You never see or interact with agent-browser directly — the daemon handles all routing
 
 ## Ref Sources
 

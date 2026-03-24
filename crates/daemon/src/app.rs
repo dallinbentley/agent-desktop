@@ -55,7 +55,7 @@ fn open_app_with_options(name: &str, background: bool) -> Result<(String, i32, b
 /// Open app with CDP (Chrome DevTools Protocol) enabled.
 /// Force-quits existing instance (waits for PID to exit), then relaunches
 /// with --remote-debugging-port. Waits for new PID + CDP port readiness.
-pub fn open_app_with_cdp(
+pub async fn open_app_with_cdp(
     name: &str,
     state: &mut DaemonState,
 ) -> Result<(String, i32, bool, u16), agent_computer_shared::types::ErrorInfo> {
@@ -172,10 +172,12 @@ pub fn open_app_with_cdp(
                 eprintln!("[app] Stored CDP mapping: PID {} → port {} ({})", pid, port, name);
             }
 
-            // Auto-connect agent-browser session
+            // Pre-warm: auto-connect agent-browser session
+            // Brief delay to let CDP fully initialize beyond just port availability
             if state.browser_bridge.is_available() && cdp_ready {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 let session = name.to_lowercase().replace(' ', "-");
-                match state.browser_bridge.connect(&session, port) {
+                match state.browser_bridge.connect(&session, port).await {
                     Ok(()) => {
                         eprintln!("[app] agent-browser session '{}' connected on port {}", session, port);
                     }
@@ -249,7 +251,7 @@ fn get_frontmost_window_title_for_pid(pid: i32) -> Option<String> {
 // MARK: - Command Handlers
 
 /// Handle the "open" command.
-pub fn handle_open(
+pub async fn handle_open(
     id: &str,
     args: &OpenArgs,
     state: &mut DaemonState,
@@ -258,7 +260,7 @@ pub fn handle_open(
     let elapsed = || start.elapsed().as_secs_f64() * 1000.0;
 
     if args.with_cdp {
-        match open_app_with_cdp(&args.target, state) {
+        match open_app_with_cdp(&args.target, state).await {
             Ok((app_name, pid, was_running, port)) => Response::ok(
                 id.to_string(),
                 ResponseData::Open(OpenData {
@@ -294,7 +296,7 @@ pub fn handle_open(
 }
 
 /// Handle the "get" command.
-pub fn handle_get(
+pub async fn handle_get(
     id: &str,
     args: &GetArgs,
     state: &mut DaemonState,
@@ -330,7 +332,7 @@ pub fn handle_get(
                         if let (Some(ref ab_ref), Some(ref session), Some(cdp_port)) =
                             (&elem_ref.ab_ref, &elem_ref.ab_session, elem_ref.cdp_port)
                         {
-                            match state.browser_bridge.get_web(session, cdp_port, "text", Some(ab_ref)) {
+                            match state.browser_bridge.get_web(session, cdp_port, "text", Some(ab_ref)).await {
                                 Ok(text) => {
                                     return Response::ok(
                                         id.to_string(),
@@ -400,7 +402,7 @@ pub fn handle_get(
                         .and_then(|e| e.ab_ref.clone())
                         .unwrap_or_else(|| r.clone())
                 });
-                match state.browser_bridge.get_web(&session, port, &what, ab_ref.as_deref()) {
+                match state.browser_bridge.get_web(&session, port, &what, ab_ref.as_deref()).await {
                     Ok(text) => {
                         Response::ok(
                             id.to_string(),
