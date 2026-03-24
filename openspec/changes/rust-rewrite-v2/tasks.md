@@ -1,9 +1,9 @@
 ## 1. Rust Project Skeleton & Shared Types
 
-- [ ] 1.1 Create Cargo workspace with three crates: `cli` (agent-computer binary), `daemon` (agent-computer-daemon binary), `shared` (agent-computer-shared library). Add dependencies: clap, serde, serde_json, tokio, tungstenite, accessibility-sys, core-graphics, screencapturekit-rs. Verify `cargo build` succeeds with placeholder mains.
-- [ ] 1.2 Port all protocol types from Swift Sources/Shared/Protocol.swift to shared/src/protocol.rs: Request, Response, CommandArgs (all variants), ResponseData (all variants), all data payload structs. Derive Serialize/Deserialize. Add unit test for JSON round-trip.
-- [ ] 1.3 Port types from Swift Sources/Shared/Types.swift to shared/src/types.rs: ElementRef (with RefSource enum: AX/CDP/Coordinate), PathSegment, Rect, Point, ErrorInfo, ErrorCode constants, interactive_roles set, key_name_to_code map, socket path constants.
-- [ ] 1.4 Port error helpers from Swift Sources/Shared/Errors.swift to shared/src/errors.rs: factory functions for all error codes (ref_not_found, ref_stale, no_ref_map, app_not_found, permission_denied, timeout, cdp_not_available, etc). Add permission check functions.
+- [x] 1.1 Create Cargo workspace with three crates: `cli` (agent-computer binary), `daemon` (agent-computer-daemon binary), `shared` (agent-computer-shared library). Add dependencies: clap, serde, serde_json, tokio, tungstenite, accessibility-sys, core-graphics, screencapturekit-rs. Verify `cargo build` succeeds with placeholder mains.
+- [x] 1.2 Port all protocol types from Swift Sources/Shared/Protocol.swift to shared/src/protocol.rs: Request, Response, CommandArgs (all variants), ResponseData (all variants), all data payload structs. Derive Serialize/Deserialize. Add unit test for JSON round-trip.
+- [x] 1.3 Port types from Swift Sources/Shared/Types.swift to shared/src/types.rs: ElementRef (with RefSource enum: AX/CDP/Coordinate), PathSegment, Rect, Point, ErrorInfo, ErrorCode constants, interactive_roles set, key_name_to_code map, socket path constants.
+- [x] 1.4 Port error helpers from Swift Sources/Shared/Errors.swift to shared/src/errors.rs: factory functions for all error codes (ref_not_found, ref_stale, no_ref_map, app_not_found, permission_denied, timeout, cdp_not_available, etc). Add permission check functions.
 
 ## 2. Daemon Socket Server
 
