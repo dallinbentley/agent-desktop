@@ -7,14 +7,14 @@
 
 ## 2. Daemon Socket Server
 
-- [ ] 2.1 Port daemon entry point from Swift Sources/Daemon/main.swift to daemon/src/main.rs: create Unix socket at ~/.agent-computer/daemon.sock, listen for connections, read newline-delimited JSON, decode command field, dispatch to handler stubs. Handle SIGTERM/SIGINT (remove socket, exit 0). Handle stale sockets.
-- [ ] 2.2 Add request ID correlation and timing (elapsed_ms). Handle malformed JSON with INVALID_COMMAND error. Support concurrent command dispatch via tokio async runtime.
+- [x] 2.1 Port daemon entry point from Swift Sources/Daemon/main.swift to daemon/src/main.rs: create Unix socket at ~/.agent-computer/daemon.sock, listen for connections, read newline-delimited JSON, decode command field, dispatch to handler stubs. Handle SIGTERM/SIGINT (remove socket, exit 0). Handle stale sockets.
+- [x] 2.2 Add request ID correlation and timing (elapsed_ms). Handle malformed JSON with INVALID_COMMAND error. Support concurrent command dispatch via tokio async runtime.
 
 ## 3. CLI Client & Argument Parsing
 
-- [ ] 3.1 Port CLI from Swift Sources/CLI/AgentComputer.swift to cli/src/main.rs using clap: define all subcommands (snapshot, click, fill, type, press, scroll, screenshot, open, get, status). Parse @ref syntax, key+modifier combos, coordinate pairs. Add --json, --timeout, --verbose global flags. Add new --with-cdp flag on open subcommand.
-- [ ] 3.2 Port socket client from Swift Sources/CLI/Connection.swift to cli/src/connection.rs: connect to daemon socket, auto-start daemon if missing (spawn background process, poll 100ms/5s), send JSON line, read response.
-- [ ] 3.3 Port output formatting from Swift Sources/CLI/Output.swift to cli/src/output.rs: colored human-readable text (snapshot tree, action confirmations, error messages with suggestions), JSON mode, exit codes.
+- [x] 3.1 Port CLI from Swift Sources/CLI/AgentComputer.swift to cli/src/main.rs using clap: define all subcommands (snapshot, click, fill, type, press, scroll, screenshot, open, get, status). Parse @ref syntax, key+modifier combos, coordinate pairs. Add --json, --timeout, --verbose global flags. Add new --with-cdp flag on open subcommand.
+- [x] 3.2 Port socket client from Swift Sources/CLI/Connection.swift to cli/src/connection.rs: connect to daemon socket, auto-start daemon if missing (spawn background process, poll 100ms/5s), send JSON line, read response.
+- [x] 3.3 Port output formatting from Swift Sources/CLI/Output.swift to cli/src/output.rs: colored human-readable text (snapshot tree, action confirmations, error messages with suggestions), JSON mode, exit codes.
 
 ## 4. AX Engine (Accessibility Tree)
 
@@ -32,18 +32,18 @@
 
 ## 6. CDP Engine (Chrome DevTools Protocol)
 
-- [ ] 6.1 Create daemon/src/cdp_engine.rs: implement CDP WebSocket client using tungstenite. Connect to ws://localhost:<port>/json/version to get WebSocket debugger URL. Upgrade to WebSocket. Send/receive JSON-RPC messages with incrementing IDs.
-- [ ] 6.2 Implement page discovery: HTTP GET localhost:<port>/json/list to enumerate tabs. Auto-select the active/visible tab. Connect to its webSocketDebuggerUrl.
-- [ ] 6.3 Implement CDP accessibility tree: call Accessibility.getFullAXTree (or DOM.getDocument + Accessibility.queryAXTree). Walk the tree, filter to interactive roles, assign @refs matching the AX engine format. Produce same snapshot text output.
-- [ ] 6.4 Implement CDP interactions: click (DOM.focus + Runtime.callFunctionOn to .click(), or Input.dispatchMouseEvent), type (Input.insertText or Input.dispatchKeyEvent), fill (focus + select all + insertText).
-- [ ] 6.5 Implement CDP port probing: HTTP GET localhost:<port>/json/version with 500ms timeout. Return bool + version info. Try ports 9222-9229 and app-specific deterministic ports.
-- [ ] 6.6 Implement CDP connection management in daemon state: track active connections by PID/port, reuse connections across commands, close on daemon shutdown.
+- [x] 6.1 Create daemon/src/cdp_engine.rs: implement CDP WebSocket client using tungstenite. Connect to ws://localhost:<port>/json/version to get WebSocket debugger URL. Upgrade to WebSocket. Send/receive JSON-RPC messages with incrementing IDs.
+- [x] 6.2 Implement page discovery: HTTP GET localhost:<port>/json/list to enumerate tabs. Auto-select the active/visible tab. Connect to its webSocketDebuggerUrl.
+- [x] 6.3 Implement CDP accessibility tree: call Accessibility.getFullAXTree (or DOM.getDocument + Accessibility.queryAXTree). Walk the tree, filter to interactive roles, assign @refs matching the AX engine format. Produce same snapshot text output.
+- [x] 6.4 Implement CDP interactions: click (DOM.focus + Runtime.callFunctionOn to .click(), or Input.dispatchMouseEvent), type (Input.insertText or Input.dispatchKeyEvent), fill (focus + select all + insertText).
+- [x] 6.5 Implement CDP port probing: HTTP GET localhost:<port>/json/version with 500ms timeout. Return bool + version info. Try ports 9222-9229 and app-specific deterministic ports.
+- [x] 6.6 Implement CDP connection management in daemon state: track active connections by PID/port, reuse connections across commands, close on daemon shutdown.
 
 ## 7. App Detector & Router
 
-- [ ] 7.1 Create daemon/src/detector.rs: implement detect_app(pid) → AppKind enum (Native, Browser{port}, Electron{port}, CEF{port}, Unknown). Check bundle ID against known browsers list. Check bundle path for Electron Framework.framework and Chromium Embedded Framework.framework. Probe CDP port.
-- [ ] 7.2 Implement snapshot routing: based on AppKind, dispatch to AX engine (Native), merged AX+CDP (Browser with CDP), CDP only (Electron/CEF with CDP), or screenshot fallback (no CDP). For merged mode: AX snapshot stops at AXWebArea boundary, CDP handles web content, refs are unified.
-- [ ] 7.3 Implement interaction routing: resolve ref from unified RefMap, check source (AX/CDP/Coordinate), dispatch to correct engine.
+- [x] 7.1 Create daemon/src/detector.rs: implement detect_app(pid) → AppKind enum (Native, Browser{port}, Electron{port}, CEF{port}, Unknown). Check bundle ID against known browsers list. Check bundle path for Electron Framework.framework and Chromium Embedded Framework.framework. Probe CDP port.
+- [x] 7.2 Implement snapshot routing: based on AppKind, dispatch to AX engine (Native), merged AX+CDP (Browser with CDP), CDP only (Electron/CEF with CDP), or screenshot fallback (no CDP). For merged mode: AX snapshot stops at AXWebArea boundary, CDP handles web content, refs are unified.
+- [x] 7.3 Implement interaction routing: resolve ref from unified RefMap, check source (AX/CDP/Coordinate), dispatch to correct engine.
 
 ## 8. Screenshot Engine
 
@@ -53,15 +53,15 @@
 
 ## 9. Unified RefMap
 
-- [ ] 9.1 Create daemon/src/refmap.rs: port RefMap from Swift Sources/Daemon/RefMap.swift with extended ElementRef supporting RefSource (AX, CDP, Coordinate). Assign sequential refs across both sources. Provide resolve(ref) → ElementRef with source-aware data.
-- [ ] 9.2 Implement merged ref building: given AX tree nodes and CDP tree nodes, assign @e1... continuously. AX refs first (browser chrome), then CDP refs (web content). Store source-specific data (axPath for AX, cdpNodeId for CDP).
-- [ ] 9.3 Implement source-aware dispatch: resolve ref → check source → route to ax_engine, cdp_engine, or input_engine accordingly.
+- [x] 9.1 Create daemon/src/refmap.rs: port RefMap from Swift Sources/Daemon/RefMap.swift with extended ElementRef supporting RefSource (AX, CDP, Coordinate). Assign sequential refs across both sources. Provide resolve(ref) → ElementRef with source-aware data.
+- [x] 9.2 Implement merged ref building: given AX tree nodes and CDP tree nodes, assign @e1... continuously. AX refs first (browser chrome), then CDP refs (web content). Store source-specific data (axPath for AX, cdpNodeId for CDP).
+- [x] 9.3 Implement source-aware dispatch: resolve ref → check source → route to ax_engine, cdp_engine, or input_engine accordingly.
 
 ## 10. App Management & Open --with-cdp
 
-- [ ] 10.1 Port app management from Swift Sources/Daemon/AppManager.swift: open/focus app (NSWorkspace via objc), get running apps list, get text from AX element, status command with permissions + frontmost app + ref map state.
-- [ ] 10.2 Implement `open --with-cdp <app>`: detect app kind, quit existing instance, relaunch with --remote-debugging-port=<deterministic_port>. For Electron: pass flag to app binary. For CEF (Spotify): launch via direct binary path. Wait for app + CDP to be ready. Store CDP connection in daemon state.
-- [ ] 10.3 Implement deterministic port assignment: hash app name → port in 9222-9399 range. Track assigned ports in daemon state. Avoid port conflicts.
+- [x] 10.1 Port app management from Swift Sources/Daemon/AppManager.swift: open/focus app (NSWorkspace via objc), get running apps list, get text from AX element, status command with permissions + frontmost app + ref map state.
+- [x] 10.2 Implement `open --with-cdp <app>`: detect app kind, quit existing instance, relaunch with --remote-debugging-port=<deterministic_port>. For Electron: pass flag to app binary. For CEF (Spotify): launch via direct binary path. Wait for app + CDP to be ready. Store CDP connection in daemon state.
+- [x] 10.3 Implement deterministic port assignment: hash app name → port in 9222-9399 range. Track assigned ports in daemon state. Avoid port conflicts.
 
 ## 11. Wire Everything Together
 
