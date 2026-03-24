@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/master.swiftdeps"
+  },
+  "/Users/dallin/projects/computer-use/Sources/Spikes/Screenshot/main.swift": {
+    "dependencies": "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/main.d",
+    "object": "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/main.swift.o",
+    "swiftmodule": "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/main.swiftdeps",
+    "diagnostics": "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/main.dia"
+  }
+}

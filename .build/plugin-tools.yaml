@@ -1,0 +1,249 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "PackageStructure": ["<PackageStructure>"]
+  "SpikeAXPerf-arm64-apple-macosx26.0-debug.module": ["<SpikeAXPerf-arm64-apple-macosx26.0-debug.module>"]
+  "SpikeCGEvent-arm64-apple-macosx26.0-debug.module": ["<SpikeCGEvent-arm64-apple-macosx26.0-debug.module>"]
+  "SpikeDaemon-arm64-apple-macosx26.0-debug.module": ["<SpikeDaemon-arm64-apple-macosx26.0-debug.module>"]
+  "SpikeScreenshot-arm64-apple-macosx26.0-debug.module": ["<SpikeScreenshot-arm64-apple-macosx26.0-debug.module>"]
+  "main": ["<SpikeAXPerf-arm64-apple-macosx26.0-debug.module>","<SpikeCGEvent-arm64-apple-macosx26.0-debug.module>","<SpikeDaemon-arm64-apple-macosx26.0-debug.module>","<SpikeScreenshot-arm64-apple-macosx26.0-debug.module>","<spike-ax-perf-arm64-apple-macosx26.0-debug.exe>","<spike-cgevent-arm64-apple-macosx26.0-debug.exe>","<spike-daemon-arm64-apple-macosx26.0-debug.exe>","<spike-screenshot-arm64-apple-macosx26.0-debug.exe>"]
+  "spike-ax-perf-arm64-apple-macosx26.0-debug.exe": ["<spike-ax-perf-arm64-apple-macosx26.0-debug.exe>"]
+  "spike-cgevent-arm64-apple-macosx26.0-debug.exe": ["<spike-cgevent-arm64-apple-macosx26.0-debug.exe>"]
+  "spike-daemon-arm64-apple-macosx26.0-debug.exe": ["<spike-daemon-arm64-apple-macosx26.0-debug.exe>"]
+  "spike-screenshot-arm64-apple-macosx26.0-debug.exe": ["<spike-screenshot-arm64-apple-macosx26.0-debug.exe>"]
+  "test": ["<SpikeAXPerf-arm64-apple-macosx26.0-debug.module>","<SpikeCGEvent-arm64-apple-macosx26.0-debug.module>","<SpikeDaemon-arm64-apple-macosx26.0-debug.module>","<SpikeScreenshot-arm64-apple-macosx26.0-debug.module>","<spike-ax-perf-arm64-apple-macosx26.0-debug.exe>","<spike-cgevent-arm64-apple-macosx26.0-debug.exe>","<spike-daemon-arm64-apple-macosx26.0-debug.exe>","<spike-screenshot-arm64-apple-macosx26.0-debug.exe>"]
+default: "main"
+nodes:
+  "/Users/dallin/projects/computer-use/Sources/Spikes/AXPerf/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/dallin/projects/computer-use/Sources/Spikes/CGEvent/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/dallin/projects/computer-use/Sources/Spikes/Daemon/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/dallin/projects/computer-use/Sources/Spikes/Screenshot/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf":
+    is-mutated: true
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent":
+    is-mutated: true
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon":
+    is-mutated: true
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot":
+    is-mutated: true
+commands:
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeAXPerf.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/dallin/projects/computer-use/Sources/Spikes/AXPerf/main.swift"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeAXPerf.build/sources"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeAXPerf.build/sources"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeCGEvent.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/dallin/projects/computer-use/Sources/Spikes/CGEvent/main.swift"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeCGEvent.build/sources"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeCGEvent.build/sources"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeDaemon.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/dallin/projects/computer-use/Sources/Spikes/Daemon/main.swift"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeDaemon.build/sources"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeDaemon.build/sources"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/dallin/projects/computer-use/Sources/Spikes/Screenshot/main.swift"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/sources"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/sources"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf-entitlement.plist"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf-entitlement.plist"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeAXPerf.build/main.swift.o"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf.product/Objects.LinkFileList"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent-entitlement.plist"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent-entitlement.plist"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeCGEvent.build/main.swift.o"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent.product/Objects.LinkFileList"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon-entitlement.plist"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon-entitlement.plist"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeDaemon.build/main.swift.o"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon.product/Objects.LinkFileList"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot-entitlement.plist"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot-entitlement.plist"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/main.swift.o"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot.product/Objects.LinkFileList"
+
+  "/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Library/Developer/CommandLineTools/usr/bin/swiftc"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+
+  "<SpikeAXPerf-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeAXPerf.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeAXPerf.swiftmodule"]
+    outputs: ["<SpikeAXPerf-arm64-apple-macosx26.0-debug.module>"]
+
+  "<SpikeCGEvent-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeCGEvent.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeCGEvent.swiftmodule"]
+    outputs: ["<SpikeCGEvent-arm64-apple-macosx26.0-debug.module>"]
+
+  "<SpikeDaemon-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeDaemon.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeDaemon.swiftmodule"]
+    outputs: ["<SpikeDaemon-arm64-apple-macosx26.0-debug.module>"]
+
+  "<SpikeScreenshot-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeScreenshot.swiftmodule"]
+    outputs: ["<SpikeScreenshot-arm64-apple-macosx26.0-debug.module>"]
+
+  "<spike-ax-perf-arm64-apple-macosx26.0-debug.exe>":
+    tool: phony
+    inputs: ["<spike-ax-perf-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    outputs: ["<spike-ax-perf-arm64-apple-macosx26.0-debug.exe>"]
+
+  "<spike-cgevent-arm64-apple-macosx26.0-debug.exe>":
+    tool: phony
+    inputs: ["<spike-cgevent-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    outputs: ["<spike-cgevent-arm64-apple-macosx26.0-debug.exe>"]
+
+  "<spike-daemon-arm64-apple-macosx26.0-debug.exe>":
+    tool: phony
+    inputs: ["<spike-daemon-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    outputs: ["<spike-daemon-arm64-apple-macosx26.0-debug.exe>"]
+
+  "<spike-screenshot-arm64-apple-macosx26.0-debug.exe>":
+    tool: phony
+    inputs: ["<spike-screenshot-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    outputs: ["<spike-screenshot-arm64-apple-macosx26.0-debug.exe>"]
+
+  "C.SpikeAXPerf-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/Sources/Spikes/AXPerf/main.swift","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeAXPerf.build/sources"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeAXPerf.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeAXPerf.swiftmodule"]
+    description: "Compiling Swift Module 'SpikeAXPerf' (1 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","SpikeAXPerf","-emit-dependencies","-emit-module","-emit-module-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeAXPerf.swiftmodule","-output-file-map","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeAXPerf.build/output-file-map.json","-incremental","-c","@/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeAXPerf.build/sources","-I","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j14","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","SpikeAXPerf_main","-swift-version","5","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","computer_use"]
+
+  "C.SpikeCGEvent-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/Sources/Spikes/CGEvent/main.swift","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeCGEvent.build/sources"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeCGEvent.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeCGEvent.swiftmodule"]
+    description: "Compiling Swift Module 'SpikeCGEvent' (1 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","SpikeCGEvent","-emit-dependencies","-emit-module","-emit-module-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeCGEvent.swiftmodule","-output-file-map","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeCGEvent.build/output-file-map.json","-incremental","-c","@/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeCGEvent.build/sources","-I","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j14","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","SpikeCGEvent_main","-swift-version","5","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","computer_use"]
+
+  "C.SpikeDaemon-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/Sources/Spikes/Daemon/main.swift","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeDaemon.build/sources"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeDaemon.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeDaemon.swiftmodule"]
+    description: "Compiling Swift Module 'SpikeDaemon' (1 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","SpikeDaemon","-emit-dependencies","-emit-module","-emit-module-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeDaemon.swiftmodule","-output-file-map","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeDaemon.build/output-file-map.json","-incremental","-c","@/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeDaemon.build/sources","-I","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j14","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","SpikeDaemon_main","-swift-version","5","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","computer_use"]
+
+  "C.SpikeScreenshot-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/Sources/Spikes/Screenshot/main.swift","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/sources"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeScreenshot.swiftmodule"]
+    description: "Compiling Swift Module 'SpikeScreenshot' (1 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","SpikeScreenshot","-emit-dependencies","-emit-module","-emit-module-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeScreenshot.swiftmodule","-output-file-map","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/output-file-map.json","-incremental","-c","@/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/sources","-I","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j14","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","SpikeScreenshot_main","-swift-version","5","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","computer_use"]
+
+  "C.spike-ax-perf-arm64-apple-macosx26.0-debug.exe":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeAXPerf.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf.product/Objects.LinkFileList"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/spike-ax-perf"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-L","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug","-o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf","-module-name","spike_ax_perf","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_SpikeAXPerf_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Library/Developer/CommandLineTools/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeAXPerf.swiftmodule","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g"]
+
+  "C.spike-ax-perf-arm64-apple-macosx26.0-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf-entitlement.plist"]
+    outputs: ["<spike-ax-perf-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/spike-ax-perf"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf-entitlement.plist","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-ax-perf"]
+
+  "C.spike-cgevent-arm64-apple-macosx26.0-debug.exe":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeCGEvent.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent.product/Objects.LinkFileList"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/spike-cgevent"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-L","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug","-o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent","-module-name","spike_cgevent","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_SpikeCGEvent_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Library/Developer/CommandLineTools/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeCGEvent.swiftmodule","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g"]
+
+  "C.spike-cgevent-arm64-apple-macosx26.0-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent-entitlement.plist"]
+    outputs: ["<spike-cgevent-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/spike-cgevent"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent-entitlement.plist","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-cgevent"]
+
+  "C.spike-daemon-arm64-apple-macosx26.0-debug.exe":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeDaemon.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon.product/Objects.LinkFileList"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/spike-daemon"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-L","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug","-o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon","-module-name","spike_daemon","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_SpikeDaemon_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Library/Developer/CommandLineTools/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeDaemon.swiftmodule","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g"]
+
+  "C.spike-daemon-arm64-apple-macosx26.0-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon-entitlement.plist"]
+    outputs: ["<spike-daemon-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/spike-daemon"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon-entitlement.plist","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-daemon"]
+
+  "C.spike-screenshot-arm64-apple-macosx26.0-debug.exe":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/SpikeScreenshot.build/main.swift.o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot.product/Objects.LinkFileList"]
+    outputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/spike-screenshot"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-L","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug","-o","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot","-module-name","spike_screenshot","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_SpikeScreenshot_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Library/Developer/CommandLineTools/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/Modules/SpikeScreenshot.swiftmodule","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g"]
+
+  "C.spike-screenshot-arm64-apple-macosx26.0-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot-entitlement.plist"]
+    outputs: ["<spike-screenshot-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/spike-screenshot"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot-entitlement.plist","/Users/dallin/projects/computer-use/.build/arm64-apple-macosx/debug/spike-screenshot"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/dallin/projects/computer-use/Sources/Spikes/AXPerf/","/Users/dallin/projects/computer-use/Sources/Spikes/CGEvent/","/Users/dallin/projects/computer-use/Sources/Spikes/Daemon/","/Users/dallin/projects/computer-use/Sources/Spikes/Screenshot/","/Users/dallin/projects/computer-use/Package.swift","/Users/dallin/projects/computer-use/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+
