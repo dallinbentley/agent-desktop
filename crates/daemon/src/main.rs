@@ -1436,8 +1436,10 @@ async fn main() {
     log("agent-computer-daemon starting...");
     log(&format!("PID: {}", std::process::id()));
 
-    let socket_dir = daemon_socket_dir();
     let socket_path = daemon_socket_path();
+    let socket_dir = socket_path.parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(daemon_socket_dir);
 
     if let Err(e) = std::fs::create_dir_all(&socket_dir) {
         log(&format!("ERROR: Failed to create socket directory: {}", e));

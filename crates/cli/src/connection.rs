@@ -210,7 +210,10 @@ fn spawn_daemon(verbose: bool) -> Result<Option<i32>, ConnectionError> {
     }
 
     // Ensure socket directory exists
-    let socket_dir = agent_computer_shared::types::daemon_socket_dir();
+    let socket_path = agent_computer_shared::types::daemon_socket_path();
+    let socket_dir = socket_path.parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(agent_computer_shared::types::daemon_socket_dir);
     let _ = std::fs::create_dir_all(&socket_dir);
 
     // Create ready-pipe: pipe_fds[0] = read end, pipe_fds[1] = write end
@@ -224,6 +227,11 @@ fn spawn_daemon(verbose: bool) -> Result<Option<i32>, ConnectionError> {
     let mut cmd = std::process::Command::new(&final_path);
     cmd.stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
+
+    // Forward AGENT_COMPUTER_SOCKET to daemon so it listens on the same custom path
+    if let Ok(custom_socket) = std::env::var("AGENT_COMPUTER_SOCKET") {
+        cmd.env("AGENT_COMPUTER_SOCKET", custom_socket);
+    }
 
     if let Some(wfd) = write_fd {
         // Pass write fd to daemon via env var

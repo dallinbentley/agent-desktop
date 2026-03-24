@@ -687,6 +687,9 @@ fn uuid_v4() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::Parser;
+
+    // ── Existing helper tests ──
 
     #[test]
     fn test_parse_ref_valid() {
@@ -722,5 +725,547 @@ mod tests {
         let (key, mods) = parse_key_combo("command+option+a");
         assert_eq!(key, "a");
         assert_eq!(mods, vec!["cmd", "alt"]);
+    }
+
+    // ── Group 3.1: Subcommand Parsing Tests ──
+
+    // -- Snapshot variants --
+
+    #[test]
+    fn test_parse_snapshot_interactive() {
+        let cli = Cli::try_parse_from(["agent-computer", "snapshot", "-i"]).unwrap();
+        match cli.command {
+            Commands::Snapshot { interactive, compact, depth, app, selector } => {
+                assert!(interactive);
+                assert!(!compact);
+                assert!(depth.is_none());
+                assert!(app.is_none());
+                assert!(selector.is_none());
+            }
+            _ => panic!("Expected Snapshot"),
+        }
+    }
+
+    #[test]
+    fn test_parse_snapshot_compact() {
+        let cli = Cli::try_parse_from(["agent-computer", "snapshot", "-c"]).unwrap();
+        match cli.command {
+            Commands::Snapshot { compact, .. } => assert!(compact),
+            _ => panic!("Expected Snapshot"),
+        }
+    }
+
+    #[test]
+    fn test_parse_snapshot_depth() {
+        let cli = Cli::try_parse_from(["agent-computer", "snapshot", "-d", "5"]).unwrap();
+        match cli.command {
+            Commands::Snapshot { depth, .. } => assert_eq!(depth, Some(5)),
+            _ => panic!("Expected Snapshot"),
+        }
+    }
+
+    #[test]
+    fn test_parse_snapshot_app() {
+        let cli = Cli::try_parse_from(["agent-computer", "snapshot", "--app", "Finder"]).unwrap();
+        match cli.command {
+            Commands::Snapshot { app, .. } => assert_eq!(app.as_deref(), Some("Finder")),
+            _ => panic!("Expected Snapshot"),
+        }
+    }
+
+    #[test]
+    fn test_parse_snapshot_selector() {
+        let cli = Cli::try_parse_from(["agent-computer", "snapshot", "-s", ".main"]).unwrap();
+        match cli.command {
+            Commands::Snapshot { selector, .. } => assert_eq!(selector.as_deref(), Some(".main")),
+            _ => panic!("Expected Snapshot"),
+        }
+    }
+
+    // -- Click variants --
+
+    #[test]
+    fn test_parse_click_ref() {
+        let cli = Cli::try_parse_from(["agent-computer", "click", "@e3"]).unwrap();
+        match cli.command {
+            Commands::Click { ref_or_x, y, double, right, .. } => {
+                assert_eq!(ref_or_x, "@e3");
+                assert!(y.is_none());
+                assert!(!double);
+                assert!(!right);
+            }
+            _ => panic!("Expected Click"),
+        }
+    }
+
+    #[test]
+    fn test_parse_click_coordinates() {
+        let cli = Cli::try_parse_from(["agent-computer", "click", "100", "200"]).unwrap();
+        match cli.command {
+            Commands::Click { ref_or_x, y, .. } => {
+                assert_eq!(ref_or_x, "100");
+                assert_eq!(y, Some(200.0));
+            }
+            _ => panic!("Expected Click"),
+        }
+    }
+
+    #[test]
+    fn test_parse_click_double() {
+        let cli = Cli::try_parse_from(["agent-computer", "click", "@e3", "--double"]).unwrap();
+        match cli.command {
+            Commands::Click { double, .. } => assert!(double),
+            _ => panic!("Expected Click"),
+        }
+    }
+
+    #[test]
+    fn test_parse_click_right() {
+        let cli = Cli::try_parse_from(["agent-computer", "click", "@e3", "--right"]).unwrap();
+        match cli.command {
+            Commands::Click { right, .. } => assert!(right),
+            _ => panic!("Expected Click"),
+        }
+    }
+
+    #[test]
+    fn test_parse_click_foreground_app() {
+        let cli = Cli::try_parse_from(["agent-computer", "click", "@e3", "--foreground", "--app", "Finder"]).unwrap();
+        match cli.command {
+            Commands::Click { foreground, app, .. } => {
+                assert!(foreground);
+                assert_eq!(app.as_deref(), Some("Finder"));
+            }
+            _ => panic!("Expected Click"),
+        }
+    }
+
+    // -- Fill --
+
+    #[test]
+    fn test_parse_fill() {
+        let cli = Cli::try_parse_from(["agent-computer", "fill", "@e4", "hello world"]).unwrap();
+        match cli.command {
+            Commands::Fill { r#ref, text, app } => {
+                assert_eq!(r#ref, "@e4");
+                assert_eq!(text, "hello world");
+                assert!(app.is_none());
+            }
+            _ => panic!("Expected Fill"),
+        }
+    }
+
+    // -- Type variants --
+
+    #[test]
+    fn test_parse_type_text_only() {
+        let cli = Cli::try_parse_from(["agent-computer", "type", "hello"]).unwrap();
+        match cli.command {
+            Commands::Type { ref_or_text, text, .. } => {
+                assert_eq!(ref_or_text, "hello");
+                assert!(text.is_none());
+            }
+            _ => panic!("Expected Type"),
+        }
+    }
+
+    #[test]
+    fn test_parse_type_with_ref() {
+        let cli = Cli::try_parse_from(["agent-computer", "type", "@e3", "hello"]).unwrap();
+        match cli.command {
+            Commands::Type { ref_or_text, text, .. } => {
+                assert_eq!(ref_or_text, "@e3");
+                assert_eq!(text.as_deref(), Some("hello"));
+            }
+            _ => panic!("Expected Type"),
+        }
+    }
+
+    // -- Press variants --
+
+    #[test]
+    fn test_parse_press_simple() {
+        let cli = Cli::try_parse_from(["agent-computer", "press", "enter"]).unwrap();
+        match cli.command {
+            Commands::Press { key, app } => {
+                assert_eq!(key, "enter");
+                assert!(app.is_none());
+            }
+            _ => panic!("Expected Press"),
+        }
+    }
+
+    #[test]
+    fn test_parse_press_combo() {
+        let cli = Cli::try_parse_from(["agent-computer", "press", "cmd+shift+s"]).unwrap();
+        match cli.command {
+            Commands::Press { key, .. } => assert_eq!(key, "cmd+shift+s"),
+            _ => panic!("Expected Press"),
+        }
+    }
+
+    #[test]
+    fn test_parse_press_escape_app() {
+        let cli = Cli::try_parse_from(["agent-computer", "press", "escape", "--app", "Finder"]).unwrap();
+        match cli.command {
+            Commands::Press { key, app } => {
+                assert_eq!(key, "escape");
+                assert_eq!(app.as_deref(), Some("Finder"));
+            }
+            _ => panic!("Expected Press"),
+        }
+    }
+
+    // -- Scroll variants --
+
+    #[test]
+    fn test_parse_scroll_down() {
+        let cli = Cli::try_parse_from(["agent-computer", "scroll", "down"]).unwrap();
+        match cli.command {
+            Commands::Scroll { direction, amount, app } => {
+                assert_eq!(direction, "down");
+                assert!(amount.is_none());
+                assert!(app.is_none());
+            }
+            _ => panic!("Expected Scroll"),
+        }
+    }
+
+    #[test]
+    fn test_parse_scroll_up_amount() {
+        let cli = Cli::try_parse_from(["agent-computer", "scroll", "up", "500"]).unwrap();
+        match cli.command {
+            Commands::Scroll { direction, amount, .. } => {
+                assert_eq!(direction, "up");
+                assert_eq!(amount, Some(500));
+            }
+            _ => panic!("Expected Scroll"),
+        }
+    }
+
+    #[test]
+    fn test_parse_scroll_left_app() {
+        let cli = Cli::try_parse_from(["agent-computer", "scroll", "left", "--app", "Finder"]).unwrap();
+        match cli.command {
+            Commands::Scroll { direction, app, .. } => {
+                assert_eq!(direction, "left");
+                assert_eq!(app.as_deref(), Some("Finder"));
+            }
+            _ => panic!("Expected Scroll"),
+        }
+    }
+
+    // -- Screenshot variants --
+
+    #[test]
+    fn test_parse_screenshot_default() {
+        let cli = Cli::try_parse_from(["agent-computer", "screenshot"]).unwrap();
+        match cli.command {
+            Commands::Screenshot { full, app } => {
+                assert!(!full);
+                assert!(app.is_none());
+            }
+            _ => panic!("Expected Screenshot"),
+        }
+    }
+
+    #[test]
+    fn test_parse_screenshot_full() {
+        let cli = Cli::try_parse_from(["agent-computer", "screenshot", "--full"]).unwrap();
+        match cli.command {
+            Commands::Screenshot { full, .. } => assert!(full),
+            _ => panic!("Expected Screenshot"),
+        }
+    }
+
+    #[test]
+    fn test_parse_screenshot_app() {
+        let cli = Cli::try_parse_from(["agent-computer", "screenshot", "--app", "Finder"]).unwrap();
+        match cli.command {
+            Commands::Screenshot { app, .. } => assert_eq!(app.as_deref(), Some("Finder")),
+            _ => panic!("Expected Screenshot"),
+        }
+    }
+
+    // -- Open variants --
+
+    #[test]
+    fn test_parse_open_simple() {
+        let cli = Cli::try_parse_from(["agent-computer", "open", "Finder"]).unwrap();
+        match cli.command {
+            Commands::Open { target, with_cdp, background } => {
+                assert_eq!(target, "Finder");
+                assert!(!with_cdp);
+                assert!(!background);
+            }
+            _ => panic!("Expected Open"),
+        }
+    }
+
+    #[test]
+    fn test_parse_open_with_cdp() {
+        let cli = Cli::try_parse_from(["agent-computer", "open", "Slack", "--with-cdp"]).unwrap();
+        match cli.command {
+            Commands::Open { target, with_cdp, .. } => {
+                assert_eq!(target, "Slack");
+                assert!(with_cdp);
+            }
+            _ => panic!("Expected Open"),
+        }
+    }
+
+    #[test]
+    fn test_parse_open_background() {
+        let cli = Cli::try_parse_from(["agent-computer", "open", "Slack", "--background"]).unwrap();
+        match cli.command {
+            Commands::Open { background, .. } => assert!(background),
+            _ => panic!("Expected Open"),
+        }
+    }
+
+    // -- Get variants --
+
+    #[test]
+    fn test_parse_get_apps() {
+        let cli = Cli::try_parse_from(["agent-computer", "get", "apps"]).unwrap();
+        match cli.command {
+            Commands::Get { what, r#ref, app } => {
+                assert_eq!(what, "apps");
+                assert!(r#ref.is_none());
+                assert!(app.is_none());
+            }
+            _ => panic!("Expected Get"),
+        }
+    }
+
+    #[test]
+    fn test_parse_get_windows_app() {
+        let cli = Cli::try_parse_from(["agent-computer", "get", "windows", "--app", "Finder"]).unwrap();
+        match cli.command {
+            Commands::Get { what, app, .. } => {
+                assert_eq!(what, "windows");
+                assert_eq!(app.as_deref(), Some("Finder"));
+            }
+            _ => panic!("Expected Get"),
+        }
+    }
+
+    #[test]
+    fn test_parse_get_text_ref() {
+        let cli = Cli::try_parse_from(["agent-computer", "get", "text", "@e1"]).unwrap();
+        match cli.command {
+            Commands::Get { what, r#ref, .. } => {
+                assert_eq!(what, "text");
+                assert_eq!(r#ref.as_deref(), Some("@e1"));
+            }
+            _ => panic!("Expected Get"),
+        }
+    }
+
+    // -- Wait variants --
+
+    #[test]
+    fn test_parse_wait_ms() {
+        let cli = Cli::try_parse_from(["agent-computer", "wait", "2000"]).unwrap();
+        match cli.command {
+            Commands::Wait { ref_or_ms, load, .. } => {
+                assert_eq!(ref_or_ms.as_deref(), Some("2000"));
+                assert!(load.is_none());
+            }
+            _ => panic!("Expected Wait"),
+        }
+    }
+
+    #[test]
+    fn test_parse_wait_ref() {
+        let cli = Cli::try_parse_from(["agent-computer", "wait", "@e5"]).unwrap();
+        match cli.command {
+            Commands::Wait { ref_or_ms, .. } => {
+                assert_eq!(ref_or_ms.as_deref(), Some("@e5"));
+            }
+            _ => panic!("Expected Wait"),
+        }
+    }
+
+    #[test]
+    fn test_parse_wait_load() {
+        let cli = Cli::try_parse_from(["agent-computer", "wait", "--load", "networkidle"]).unwrap();
+        match cli.command {
+            Commands::Wait { ref_or_ms, load, .. } => {
+                assert!(ref_or_ms.is_none());
+                assert_eq!(load.as_deref(), Some("networkidle"));
+            }
+            _ => panic!("Expected Wait"),
+        }
+    }
+
+    // -- Status --
+
+    #[test]
+    fn test_parse_status() {
+        let cli = Cli::try_parse_from(["agent-computer", "status"]).unwrap();
+        assert!(matches!(cli.command, Commands::Status));
+    }
+
+    // -- InstallBrowser --
+
+    #[test]
+    fn test_parse_install_browser() {
+        let cli = Cli::try_parse_from(["agent-computer", "install-browser"]).unwrap();
+        assert!(matches!(cli.command, Commands::InstallBrowser));
+    }
+
+    // ── Group 3.2: Global Flags ──
+
+    #[test]
+    fn test_global_json_flag() {
+        let cli = Cli::try_parse_from(["agent-computer", "--json", "status"]).unwrap();
+        assert!(cli.json);
+    }
+
+    #[test]
+    fn test_global_timeout_flag() {
+        let cli = Cli::try_parse_from(["agent-computer", "--timeout", "5000", "status"]).unwrap();
+        assert_eq!(cli.timeout, Some(5000));
+    }
+
+    #[test]
+    fn test_global_verbose_flag() {
+        let cli = Cli::try_parse_from(["agent-computer", "--verbose", "status"]).unwrap();
+        assert!(cli.verbose);
+    }
+
+    #[test]
+    fn test_global_flags_default() {
+        let cli = Cli::try_parse_from(["agent-computer", "status"]).unwrap();
+        assert!(!cli.json);
+        assert!(cli.timeout.is_none());
+        assert!(!cli.verbose);
+    }
+
+    #[test]
+    fn test_global_flags_after_subcommand() {
+        // Global flags should work after subcommand too
+        let cli = Cli::try_parse_from(["agent-computer", "status", "--json"]).unwrap();
+        assert!(cli.json);
+    }
+
+    #[test]
+    fn test_multiple_global_flags() {
+        let cli = Cli::try_parse_from(["agent-computer", "--json", "--verbose", "--timeout", "3000", "status"]).unwrap();
+        assert!(cli.json);
+        assert!(cli.verbose);
+        assert_eq!(cli.timeout, Some(3000));
+    }
+
+    // ── Group 3.3: Edge Cases ──
+
+    #[test]
+    fn test_edge_coordinate_click() {
+        // `click 100 200` → ref_or_x="100", y=Some(200.0)
+        let cli = Cli::try_parse_from(["agent-computer", "click", "100", "200"]).unwrap();
+        match cli.command {
+            Commands::Click { ref_or_x, y, .. } => {
+                assert_eq!(ref_or_x, "100");
+                assert_eq!(y, Some(200.0));
+            }
+            _ => panic!("Expected Click"),
+        }
+    }
+
+    #[test]
+    fn test_edge_type_with_ref() {
+        // `type @e3 "hello"` → ref_or_text="@e3", text=Some("hello")
+        let cli = Cli::try_parse_from(["agent-computer", "type", "@e3", "hello"]).unwrap();
+        match cli.command {
+            Commands::Type { ref_or_text, text, .. } => {
+                assert_eq!(ref_or_text, "@e3");
+                assert_eq!(text.as_deref(), Some("hello"));
+            }
+            _ => panic!("Expected Type"),
+        }
+    }
+
+    #[test]
+    fn test_edge_type_without_ref() {
+        // `type "just text"` → ref_or_text="just text", text=None
+        let cli = Cli::try_parse_from(["agent-computer", "type", "just text"]).unwrap();
+        match cli.command {
+            Commands::Type { ref_or_text, text, .. } => {
+                assert_eq!(ref_or_text, "just text");
+                assert!(text.is_none());
+            }
+            _ => panic!("Expected Type"),
+        }
+    }
+
+    #[test]
+    fn test_edge_scroll_without_amount() {
+        let cli = Cli::try_parse_from(["agent-computer", "scroll", "down"]).unwrap();
+        match cli.command {
+            Commands::Scroll { direction, amount, .. } => {
+                assert_eq!(direction, "down");
+                assert!(amount.is_none());
+            }
+            _ => panic!("Expected Scroll"),
+        }
+    }
+
+    #[test]
+    fn test_edge_scroll_with_amount() {
+        let cli = Cli::try_parse_from(["agent-computer", "scroll", "down", "500"]).unwrap();
+        match cli.command {
+            Commands::Scroll { direction, amount, .. } => {
+                assert_eq!(direction, "down");
+                assert_eq!(amount, Some(500));
+            }
+            _ => panic!("Expected Scroll"),
+        }
+    }
+
+    #[test]
+    fn test_edge_click_no_wait() {
+        let cli = Cli::try_parse_from(["agent-computer", "click", "@e1", "--no-wait"]).unwrap();
+        match cli.command {
+            Commands::Click { no_wait, .. } => assert!(no_wait),
+            _ => panic!("Expected Click"),
+        }
+    }
+
+    #[test]
+    fn test_edge_fill_with_app() {
+        let cli = Cli::try_parse_from(["agent-computer", "fill", "@e4", "text", "--app", "Safari"]).unwrap();
+        match cli.command {
+            Commands::Fill { r#ref, text, app } => {
+                assert_eq!(r#ref, "@e4");
+                assert_eq!(text, "text");
+                assert_eq!(app.as_deref(), Some("Safari"));
+            }
+            _ => panic!("Expected Fill"),
+        }
+    }
+
+    #[test]
+    fn test_edge_wait_with_app() {
+        let cli = Cli::try_parse_from(["agent-computer", "wait", "@e5", "--app", "Chrome"]).unwrap();
+        match cli.command {
+            Commands::Wait { ref_or_ms, app, .. } => {
+                assert_eq!(ref_or_ms.as_deref(), Some("@e5"));
+                assert_eq!(app.as_deref(), Some("Chrome"));
+            }
+            _ => panic!("Expected Wait"),
+        }
+    }
+
+    #[test]
+    fn test_invalid_subcommand_fails() {
+        let result = Cli::try_parse_from(["agent-computer", "nonexistent"]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_no_subcommand_fails() {
+        let result = Cli::try_parse_from(["agent-computer"]);
+        assert!(result.is_err());
     }
 }

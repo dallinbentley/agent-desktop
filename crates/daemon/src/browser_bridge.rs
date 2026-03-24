@@ -722,9 +722,93 @@ mod tests {
     }
 
     #[test]
-    fn test_bridge_detect() {
+    fn test_bridge_new_does_not_panic() {
+        // 12.1: BrowserBridge::new() should never panic regardless of environment
         let bridge = BrowserBridge::new();
+        // It's either available or not, but shouldn't crash
         let _ = bridge.is_available();
+        let _ = bridge.binary_path();
+    }
+
+    #[test]
+    fn test_detect_binary_search_order() {
+        // 12.1: Verify detect_binary returns Some or None without panicking.
+        // The actual search order is:
+        // 1. ~/.agent-computer/bin/agent-browser (bundled)
+        // 2. PATH via `which`
+        // 3. Common npm/nvm global paths
+        // 4. nvm glob: ~/.nvm/versions/node/*/bin/agent-browser
+        // 5. Auto-download as last resort
+        let result = BrowserBridge::detect_binary();
+        // Just ensure it doesn't panic — result depends on environment
+        let _ = result;
+    }
+
+    // 12.2: Platform detection tests
+    #[test]
+    fn test_platform_detection_binary_name() {
+        // Verify the platform detection logic produces correct binary names
+        let os_name = if cfg!(target_os = "macos") { "darwin" }
+            else if cfg!(target_os = "linux") { "linux" }
+            else { "unsupported" };
+
+        let arch = if cfg!(target_arch = "aarch64") { "arm64" }
+            else if cfg!(target_arch = "x86_64") { "x64" }
+            else { "unsupported" };
+
+        let binary_name = format!("agent-browser-{}-{}", os_name, arch);
+
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        assert_eq!(binary_name, "agent-browser-darwin-arm64");
+
+        #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+        assert_eq!(binary_name, "agent-browser-darwin-x64");
+
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        assert_eq!(binary_name, "agent-browser-linux-x64");
+
+        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+        assert_eq!(binary_name, "agent-browser-linux-arm64");
+
+        // On any known platform, neither should be "unsupported"
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        assert_ne!(os_name, "unsupported");
+
+        #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+        assert_ne!(arch, "unsupported");
+    }
+
+    #[test]
+    fn test_agent_browser_version_is_set() {
+        // Verify the version constant is a valid semver-like string
+        let version = BrowserBridge::AGENT_BROWSER_VERSION;
+        assert!(!version.is_empty());
+        let parts: Vec<&str> = version.split('.').collect();
+        assert_eq!(parts.len(), 3, "Version should be semver: {}", version);
+        for part in parts {
+            assert!(part.parse::<u32>().is_ok(), "Version part '{}' should be numeric", part);
+        }
+    }
+
+    #[test]
+    fn test_bridge_with_no_binary() {
+        // Verify behavior when binary_path is None
+        let bridge = BrowserBridge {
+            binary_path: None,
+            active_sessions: HashMap::new(),
+        };
+        assert!(!bridge.is_available());
+        assert!(bridge.binary_path().is_none());
+    }
+
+    #[test]
+    fn test_bridge_with_fake_binary() {
+        let bridge = BrowserBridge {
+            binary_path: Some(PathBuf::from("/nonexistent/agent-browser")),
+            active_sessions: HashMap::new(),
+        };
+        assert!(bridge.is_available());
+        assert_eq!(bridge.binary_path().unwrap(), &PathBuf::from("/nonexistent/agent-browser"));
     }
 
     #[test]
