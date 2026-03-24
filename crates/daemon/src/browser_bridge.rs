@@ -98,8 +98,8 @@ impl BrowserBridge {
     fn detect_binary() -> Option<PathBuf> {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
 
-        // 1. Check bundled path first (~/.agent-computer/bin/agent-browser)
-        let bundled = home.join(".agent-computer/bin/agent-browser");
+        // 1. Check bundled path first (~/.agent-desktop/bin/agent-browser)
+        let bundled = home.join(".agent-desktop/bin/agent-browser");
         if bundled.exists() {
             return Some(bundled);
         }
@@ -182,7 +182,7 @@ impl BrowserBridge {
             else { return Err("Unsupported architecture".to_string()) };
 
         let binary_name = format!("agent-browser-{}-{}", os_name, arch);
-        let bin_dir = home.join(".agent-computer/bin");
+        let bin_dir = home.join(".agent-desktop/bin");
         let target_path = bin_dir.join("agent-browser");
 
         std::fs::create_dir_all(&bin_dir)
@@ -734,7 +734,7 @@ mod tests {
     fn test_detect_binary_search_order() {
         // 12.1: Verify detect_binary returns Some or None without panicking.
         // The actual search order is:
-        // 1. ~/.agent-computer/bin/agent-browser (bundled)
+        // 1. ~/.agent-desktop/bin/agent-browser (bundled)
         // 2. PATH via `which`
         // 3. Common npm/nvm global paths
         // 4. nvm glob: ~/.nvm/versions/node/*/bin/agent-browser

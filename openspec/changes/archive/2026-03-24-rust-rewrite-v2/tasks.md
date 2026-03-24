@@ -1,13 +1,13 @@
 ## 1. Rust Project Skeleton & Shared Types
 
-- [x] 1.1 Create Cargo workspace with three crates: `cli` (agent-computer binary), `daemon` (agent-computer-daemon binary), `shared` (agent-computer-shared library). Add dependencies: clap, serde, serde_json, tokio, tungstenite, accessibility-sys, core-graphics, screencapturekit-rs. Verify `cargo build` succeeds with placeholder mains.
+- [x] 1.1 Create Cargo workspace with three crates: `cli` (agent-desktop binary), `daemon` (agent-desktop-daemon binary), `shared` (agent-desktop-shared library). Add dependencies: clap, serde, serde_json, tokio, tungstenite, accessibility-sys, core-graphics, screencapturekit-rs. Verify `cargo build` succeeds with placeholder mains.
 - [x] 1.2 Port all protocol types from Swift Sources/Shared/Protocol.swift to shared/src/protocol.rs: Request, Response, CommandArgs (all variants), ResponseData (all variants), all data payload structs. Derive Serialize/Deserialize. Add unit test for JSON round-trip.
 - [x] 1.3 Port types from Swift Sources/Shared/Types.swift to shared/src/types.rs: ElementRef (with RefSource enum: AX/CDP/Coordinate), PathSegment, Rect, Point, ErrorInfo, ErrorCode constants, interactive_roles set, key_name_to_code map, socket path constants.
 - [x] 1.4 Port error helpers from Swift Sources/Shared/Errors.swift to shared/src/errors.rs: factory functions for all error codes (ref_not_found, ref_stale, no_ref_map, app_not_found, permission_denied, timeout, cdp_not_available, etc). Add permission check functions.
 
 ## 2. Daemon Socket Server
 
-- [x] 2.1 Port daemon entry point from Swift Sources/Daemon/main.swift to daemon/src/main.rs: create Unix socket at ~/.agent-computer/daemon.sock, listen for connections, read newline-delimited JSON, decode command field, dispatch to handler stubs. Handle SIGTERM/SIGINT (remove socket, exit 0). Handle stale sockets.
+- [x] 2.1 Port daemon entry point from Swift Sources/Daemon/main.swift to daemon/src/main.rs: create Unix socket at ~/.agent-desktop/daemon.sock, listen for connections, read newline-delimited JSON, decode command field, dispatch to handler stubs. Handle SIGTERM/SIGINT (remove socket, exit 0). Handle stale sockets.
 - [x] 2.2 Add request ID correlation and timing (elapsed_ms). Handle malformed JSON with INVALID_COMMAND error. Support concurrent command dispatch via tokio async runtime.
 
 ## 3. CLI Client & Argument Parsing
@@ -74,4 +74,4 @@
 - [x] 12.2 Test Electron app flow (if CDP available): `open --with-cdp Slack` → `snapshot -i` → verify rich CDP refs (labeled buttons, channels) → `click @e<channel>` → verify navigation.
 - [x] 12.3 Test browser flow (if Chrome available): `open --with-cdp Chrome` → `snapshot -i` → verify merged output (AX chrome + CDP web content) → `click @e<web_link>` → verify navigation.
 - [x] 12.4 Test fallback flow: `snapshot --app Spotify` (no CDP) → verify screenshot fallback with warning message. Test coordinate click.
-- [x] 12.5 Build release binary, test `agent-computer --help`, verify daemon auto-start, verify clean shutdown, verify CDP connections close on shutdown.
+- [x] 12.5 Build release binary, test `agent-desktop --help`, verify daemon auto-start, verify clean shutdown, verify CDP connections close on shutdown.

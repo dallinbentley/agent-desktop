@@ -1,15 +1,15 @@
 ## ADDED Requirements
 
 ### Requirement: Cargo workspace with CLI, daemon, and shared crates
-The project SHALL be structured as a Cargo workspace with three crates: `agent-computer` (CLI binary), `agent-computer-daemon` (daemon binary), and `agent-computer-shared` (library). All protocol types, error codes, and constants SHALL live in the shared crate.
+The project SHALL be structured as a Cargo workspace with three crates: `agent-desktop` (CLI binary), `agent-desktop-daemon` (daemon binary), and `agent-desktop-shared` (library). All protocol types, error codes, and constants SHALL live in the shared crate.
 
 #### Scenario: Build produces two binaries
 - **WHEN** `cargo build --release` is run
-- **THEN** two binaries are produced: `agent-computer` and `agent-computer-daemon`
+- **THEN** two binaries are produced: `agent-desktop` and `agent-desktop-daemon`
 
 #### Scenario: Shared types used by both
 - **WHEN** CLI sends a Request and daemon sends a Response
-- **THEN** both use the same Codable types from agent-computer-shared
+- **THEN** both use the same Codable types from agent-desktop-shared
 
 ### Requirement: All protocol types ported from Swift
 The shared crate SHALL define: Request, Response, CommandArgs (snapshot, click, fill, type, press, scroll, screenshot, open, get, status), ResponseData variants, ElementRef, ErrorInfo, Timing, and all supporting types. All SHALL be serde Serializable/Deserializable.

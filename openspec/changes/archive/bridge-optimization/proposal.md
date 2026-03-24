@@ -4,7 +4,7 @@ The agent-browser bridge currently has three problems: (1) it requires users to 
 
 ## What Changes
 
-- **Bundle agent-browser binary**: Ship platform-specific agent-browser binary alongside agent-computer. Auto-download on first use if not bundled. Zero npm/Node dependency.
+- **Bundle agent-browser binary**: Ship platform-specific agent-browser binary alongside agent-desktop. Auto-download on first use if not bundled. Zero npm/Node dependency.
 - **Use `--json` output mode**: Switch from text parsing to `--json` flag for structured refs + snapshot data. Eliminates regex parsing, more reliable.
 - **Pre-warm CDP sessions**: Connect agent-browser session during `open --with-cdp` so first snapshot doesn't pay daemon startup cost.
 - **Async subprocess execution**: Use `tokio::process::Command` for non-blocking bridge calls.
@@ -23,4 +23,4 @@ The agent-browser bridge currently has three problems: (1) it requires users to 
 
 - **Files**: `browser_bridge.rs` (JSON parsing, async, binary management), `main.rs` (pre-warm on open), `app.rs` (open_app_with_cdp pre-warm), `Cargo.toml` (tokio process, serde_json)
 - **Dependencies**: `serde_json` (already present), `tokio` process feature
-- **User experience**: `agent-computer` works out of the box for Electron apps without npm install
+- **User experience**: `agent-desktop` works out of the box for Electron apps without npm install

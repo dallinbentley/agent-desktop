@@ -15,7 +15,7 @@ struct TestDaemon {
 impl TestDaemon {
     async fn start() -> Self {
         let socket_path = std::path::PathBuf::from(format!(
-            "/tmp/agent-computer-test-{}.sock",
+            "/tmp/agent-desktop-test-{}.sock",
             uuid::Uuid::new_v4()
         ));
 
@@ -47,12 +47,12 @@ impl TestDaemon {
     }
 
     fn find_daemon_binary() -> std::path::PathBuf {
-        if let Ok(path) = std::env::var("CARGO_BIN_EXE_agent-computer-daemon") {
+        if let Ok(path) = std::env::var("CARGO_BIN_EXE_agent-desktop-daemon") {
             return std::path::PathBuf::from(path);
         }
         // Check shared cargo target
         if let Some(home) = dirs::home_dir() {
-            let bin_path = home.join(".cargo-shared/target/debug/agent-computer-daemon");
+            let bin_path = home.join(".cargo-shared/target/debug/agent-desktop-daemon");
             if bin_path.exists() {
                 return bin_path;
             }
@@ -66,11 +66,11 @@ impl TestDaemon {
         let bin_path = workspace_root
             .join("target")
             .join("debug")
-            .join("agent-computer-daemon");
+            .join("agent-desktop-daemon");
         if bin_path.exists() {
             return bin_path;
         }
-        panic!("Could not find agent-computer-daemon binary");
+        panic!("Could not find agent-desktop-daemon binary");
     }
 }
 
@@ -86,7 +86,7 @@ impl Drop for TestDaemon {
 
 // --- Group 11: CLI Output Integration Tests ---
 
-/// 11.1 Test `agent-computer status` output format matches expected terminal output
+/// 11.1 Test `agent-desktop status` output format matches expected terminal output
 #[tokio::test]
 async fn test_status_output() {
     let daemon = TestDaemon::start().await;
@@ -94,14 +94,14 @@ async fn test_status_output() {
 
     cli.run(&["status"])
         .success()
-        .stdout(pred_str::contains("agent-computer daemon"))
+        .stdout(pred_str::contains("agent-desktop daemon"))
         .stdout(pred_str::contains("PID:"))
         .stdout(pred_str::contains("Accessibility:"))
         .stdout(pred_str::contains("Screen Recording:"))
         .stdout(pred_str::contains("Ref Map:"));
 }
 
-/// 11.2 Test `agent-computer snapshot -i --app Finder` output contains @refs
+/// 11.2 Test `agent-desktop snapshot -i --app Finder` output contains @refs
 #[tokio::test]
 async fn test_snapshot_output_contains_refs() {
     let daemon = TestDaemon::start().await;
@@ -114,7 +114,7 @@ async fn test_snapshot_output_contains_refs() {
     // We can't guarantee @refs exist (depends on Finder state), but the command should succeed
 }
 
-/// 11.3 Test `agent-computer --json snapshot -i --app Finder` returns valid JSON
+/// 11.3 Test `agent-desktop --json snapshot -i --app Finder` returns valid JSON
 #[tokio::test]
 async fn test_json_snapshot_output() {
     let daemon = TestDaemon::start().await;
@@ -137,7 +137,7 @@ async fn test_json_snapshot_output() {
     assert!(json.get("id").is_some(), "JSON should have 'id' field");
 }
 
-/// 11.4 Test `agent-computer click @e9999` exits with non-zero code and error message
+/// 11.4 Test `agent-desktop click @e9999` exits with non-zero code and error message
 #[tokio::test]
 async fn test_click_invalid_ref_output() {
     let daemon = TestDaemon::start().await;

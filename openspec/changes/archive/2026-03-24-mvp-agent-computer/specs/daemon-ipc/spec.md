@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Daemon listens on Unix domain socket
-The daemon SHALL create and listen on a Unix domain socket at `~/.agent-computer/daemon.sock`, accepting newline-delimited JSON commands and returning JSON responses.
+The daemon SHALL create and listen on a Unix domain socket at `~/.agent-desktop/daemon.sock`, accepting newline-delimited JSON commands and returning JSON responses.
 
 #### Scenario: Daemon accepts connection
 - **WHEN** daemon is running and CLI connects to the socket
@@ -15,7 +15,7 @@ The daemon SHALL create and listen on a Unix domain socket at `~/.agent-computer
 The CLI SHALL check if the daemon socket exists and is connectable. If not, it SHALL spawn the daemon as a background process, poll for the socket (100ms intervals, 5s timeout), and then connect.
 
 #### Scenario: Daemon not running
-- **WHEN** user runs any `agent-computer` command and daemon is not running
+- **WHEN** user runs any `agent-desktop` command and daemon is not running
 - **THEN** CLI spawns daemon, waits for socket, connects, and executes the command
 
 #### Scenario: Daemon already running

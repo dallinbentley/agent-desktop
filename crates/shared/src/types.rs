@@ -164,7 +164,7 @@ pub static KNOWN_BROWSER_BUNDLE_IDS: LazyLock<HashSet<&'static str>> = LazyLock:
 pub fn daemon_socket_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join(".agent-computer")
+        .join(".agent-desktop")
 }
 
 pub fn daemon_socket_path() -> PathBuf {
@@ -184,7 +184,7 @@ mod tests {
     fn test_daemon_socket_dir_is_under_home() {
         let dir = daemon_socket_dir();
         let dir_str = dir.to_string_lossy();
-        assert!(dir_str.ends_with(".agent-computer"), "Socket dir should end with .agent-computer, got: {}", dir_str);
+        assert!(dir_str.ends_with(".agent-desktop"), "Socket dir should end with .agent-desktop, got: {}", dir_str);
     }
 
     #[test]
@@ -194,12 +194,12 @@ mod tests {
         let path = daemon_socket_path();
         let path_str = path.to_string_lossy();
         assert!(path_str.ends_with("daemon.sock"), "Default socket should end with daemon.sock, got: {}", path_str);
-        assert!(path_str.contains(".agent-computer"), "Default socket should be under .agent-computer, got: {}", path_str);
+        assert!(path_str.contains(".agent-desktop"), "Default socket should be under .agent-desktop, got: {}", path_str);
     }
 
     #[test]
     fn test_daemon_socket_path_custom_env() {
-        let custom = "/tmp/test-agent-computer.sock";
+        let custom = "/tmp/test-agent-desktop.sock";
         std::env::set_var("AGENT_COMPUTER_SOCKET", custom);
         let path = daemon_socket_path();
         assert_eq!(path, PathBuf::from(custom));

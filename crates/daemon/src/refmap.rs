@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
-use agent_computer_shared::types::{ElementRef, RefSource};
+use agent_desktop_shared::types::{ElementRef, RefSource};
 
 // MARK: - Routing Info
 
@@ -196,7 +196,7 @@ pub fn build_cdp_refmap(cdp_refs: Vec<ElementRef>) -> RefMap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_computer_shared::types::Rect;
+    use agent_desktop_shared::types::Rect;
 
     fn make_ax_ref(id: &str, role: &str, label: Option<&str>, pid: i32) -> ElementRef {
         ElementRef {

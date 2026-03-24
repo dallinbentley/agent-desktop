@@ -1,6 +1,6 @@
 ## Context
 
-agent-computer is a CLI tool backed by a daemon process. The CLI sends JSON-line requests over a Unix socket (`~/.agent-computer/daemon.sock`), the daemon processes them (AX APIs, CGEvent, ScreenCaptureKit, agent-browser bridge), and returns JSON-line responses. Current test coverage is purely unit-level — isolated function tests within each module. There is no test that exercises the actual IPC pipeline.
+agent-desktop is a CLI tool backed by a daemon process. The CLI sends JSON-line requests over a Unix socket (`~/.agent-desktop/daemon.sock`), the daemon processes them (AX APIs, CGEvent, ScreenCaptureKit, agent-browser bridge), and returns JSON-line responses. Current test coverage is purely unit-level — isolated function tests within each module. There is no test that exercises the actual IPC pipeline.
 
 ## Goals / Non-Goals
 
@@ -23,7 +23,7 @@ agent-computer is a CLI tool backed by a daemon process. The CLI sends JSON-line
 ### D1: Test Harness Architecture
 
 **Approach**: A `TestDaemon` helper struct in `crates/daemon/tests/common/mod.rs` that:
-1. Starts the daemon binary on a unique socket path (`/tmp/agent-computer-test-{uuid}.sock`)
+1. Starts the daemon binary on a unique socket path (`/tmp/agent-desktop-test-{uuid}.sock`)
 2. Provides `send_request(Request) -> Response` helper over async Unix socket
 3. Auto-kills daemon on Drop
 4. Configurable startup timeout (default 2s)
@@ -53,7 +53,7 @@ cargo test --test integration -- --ignored  # + bridge/e2e tests (needs apps)
 
 ### D5: Socket Path Override
 
-Add `AGENT_COMPUTER_SOCKET` env var support to both daemon and CLI. The daemon listens on it, the CLI connects to it. Default remains `~/.agent-computer/daemon.sock`. This enables parallel test instances.
+Add `AGENT_COMPUTER_SOCKET` env var support to both daemon and CLI. The daemon listens on it, the CLI connects to it. Default remains `~/.agent-desktop/daemon.sock`. This enables parallel test instances.
 
 ## Risks / Trade-offs
 

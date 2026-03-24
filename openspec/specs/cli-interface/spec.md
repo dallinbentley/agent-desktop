@@ -1,43 +1,43 @@
 # cli-interface Specification
 
 ## Purpose
-TBD - created by archiving change mvp-agent-computer. Update Purpose after archive.
+TBD - created by archiving change mvp-agent-desktop. Update Purpose after archive.
 ## Requirements
 ### Requirement: Parse command grammar
-The CLI SHALL parse commands in the format `agent-computer <command> [args] [options]` using Swift Argument Parser. It SHALL support: snapshot, click, fill, type, press, scroll, screenshot, open, get, status.
+The CLI SHALL parse commands in the format `agent-desktop <command> [args] [options]` using Swift Argument Parser. It SHALL support: snapshot, click, fill, type, press, scroll, screenshot, open, get, status.
 
 #### Scenario: Valid snapshot command
-- **WHEN** user runs `agent-computer snapshot -i -d 10`
+- **WHEN** user runs `agent-desktop snapshot -i -d 10`
 - **THEN** CLI parses command as snapshot with interactive=true, depth=10
 
 #### Scenario: Valid click with ref
-- **WHEN** user runs `agent-computer click @e3`
+- **WHEN** user runs `agent-desktop click @e3`
 - **THEN** CLI parses ref as "e3", strips the @ prefix
 
 #### Scenario: Valid press with modifiers
-- **WHEN** user runs `agent-computer press cmd+shift+s`
+- **WHEN** user runs `agent-desktop press cmd+shift+s`
 - **THEN** CLI parses key as "s" with modifiers [cmd, shift]
 
 #### Scenario: Unknown command
-- **WHEN** user runs `agent-computer frobnicate`
+- **WHEN** user runs `agent-desktop frobnicate`
 - **THEN** CLI prints usage help listing available commands
 
 ### Requirement: Human-readable output by default
 The CLI SHALL format responses as colored, human-readable text by default. Snapshot output SHALL show the indented tree with @refs. Action results SHALL show a brief confirmation.
 
 #### Scenario: Snapshot output
-- **WHEN** user runs `agent-computer snapshot -i`
+- **WHEN** user runs `agent-desktop snapshot -i`
 - **THEN** output is a readable text tree with @ref annotations
 
 #### Scenario: Click confirmation
-- **WHEN** user runs `agent-computer click @e3` successfully
+- **WHEN** user runs `agent-desktop click @e3` successfully
 - **THEN** output shows brief confirmation: "Clicked @e3 button 'Submit' at (450, 230)"
 
 ### Requirement: JSON output mode
 The CLI SHALL support `--json` flag that outputs raw JSON response from the daemon.
 
 #### Scenario: JSON mode
-- **WHEN** user runs `agent-computer snapshot -i --json`
+- **WHEN** user runs `agent-desktop snapshot -i --json`
 - **THEN** output is the JSON response object with success, data, and timing fields
 
 ### Requirement: AI-friendly error messages
@@ -70,6 +70,6 @@ The CLI SHALL exit with code 0 on success and non-zero on failure.
 The `status` command SHALL report: daemon running state, accessibility permission, screen recording permission, frontmost app/window, display info, and ref map state.
 
 #### Scenario: All permissions granted
-- **WHEN** user runs `agent-computer status` with all permissions
+- **WHEN** user runs `agent-desktop status` with all permissions
 - **THEN** output shows ✅ for each permission, daemon status, frontmost app, and ref map count
 

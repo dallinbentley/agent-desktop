@@ -1,12 +1,12 @@
 ## 1. Socket Path Override (prerequisite for all integration tests)
 
-- [x] 1.1 Add `AGENT_COMPUTER_SOCKET` env var support to daemon `main.rs` — if set, listen on that path instead of `~/.agent-computer/daemon.sock`
+- [x] 1.1 Add `AGENT_COMPUTER_SOCKET` env var support to daemon `main.rs` — if set, listen on that path instead of `~/.agent-desktop/daemon.sock`
 - [x] 1.2 Add `AGENT_COMPUTER_SOCKET` env var support to CLI `connection.rs` — if set, connect to that path instead of default
 - [x] 1.3 Verify: start daemon with custom socket, CLI connects to it, status command works
 
 ## 2. Test Harness (crates/daemon/tests/common/mod.rs)
 
-- [x] 2.1 Create `TestDaemon` struct: starts daemon binary on unique temp socket (`/tmp/agent-computer-test-{uuid}.sock`), waits for socket to exist, stores child process handle
+- [x] 2.1 Create `TestDaemon` struct: starts daemon binary on unique temp socket (`/tmp/agent-desktop-test-{uuid}.sock`), waits for socket to exist, stores child process handle
 - [x] 2.2 Add `TestDaemon::send_request(Request) -> Response` helper: connects to socket, sends JSON line, reads JSON line response
 - [x] 2.3 Add `TestDaemon::send_raw(json_str) -> String` for testing malformed input handling
 - [x] 2.4 Implement `Drop` for `TestDaemon` — kills daemon process, removes socket file
@@ -74,10 +74,10 @@
 
 ## 11. CLI Output Integration Tests (crates/cli/tests/output.rs)
 
-- [x] 11.1 Test `agent-computer status` output format matches expected terminal output
-- [x] 11.2 Test `agent-computer snapshot -i --app Finder` output contains @refs
-- [x] 11.3 Test `agent-computer --json snapshot -i --app Finder` returns valid JSON
-- [x] 11.4 Test `agent-computer click @e9999` exits with non-zero code and error message
+- [x] 11.1 Test `agent-desktop status` output format matches expected terminal output
+- [x] 11.2 Test `agent-desktop snapshot -i --app Finder` output contains @refs
+- [x] 11.3 Test `agent-desktop --json snapshot -i --app Finder` returns valid JSON
+- [x] 11.4 Test `agent-desktop click @e9999` exits with non-zero code and error message
 
 ## 12. Expanded Unit Tests
 

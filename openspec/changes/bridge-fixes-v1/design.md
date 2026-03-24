@@ -29,10 +29,10 @@ Currently only `click` has `--app`. Add it to: `fill`, `type`, `press`, `scroll`
 ### D3: Wait command delegates to agent-browser
 
 ```
-agent-computer wait @e5                    # Wait for element to appear
-agent-computer wait 2000                   # Wait 2 seconds
-agent-computer wait --load networkidle     # Wait for network idle (CDP only)
-agent-computer wait --load domcontentloaded  # Wait for DOM ready
+agent-desktop wait @e5                    # Wait for element to appear
+agent-desktop wait 2000                   # Wait 2 seconds
+agent-desktop wait --load networkidle     # Wait for network idle (CDP only)
+agent-desktop wait --load domcontentloaded  # Wait for DOM ready
 ```
 
 For CDP-sourced contexts, delegates to `agent-browser --session <s> --cdp <port> wait <args>`.
@@ -62,7 +62,7 @@ After `open --with-cdp` relaunches an app, the window may not be rendered for ~1
 
 Pass through to agent-browser's `--selector` flag:
 ```
-agent-computer snapshot -i --app Spotify --selector "#main-content"
+agent-desktop snapshot -i --app Spotify --selector "#main-content"
 ```
 Becomes: `agent-browser --session spotify --cdp 9371 snapshot -i -s "#main-content"`
 

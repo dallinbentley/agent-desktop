@@ -82,7 +82,7 @@ pub fn invalid_command(detail: &str) -> ErrorInfo {
     ErrorInfo {
         code: error_code::INVALID_COMMAND.to_string(),
         message: format!("Invalid command: {detail}"),
-        suggestion: Some("Run `agent-computer --help` for usage.".to_string()),
+        suggestion: Some("Run `agent-desktop --help` for usage.".to_string()),
     }
 }
 
@@ -98,7 +98,7 @@ pub fn cdp_not_available(app_name: &str) -> ErrorInfo {
     ErrorInfo {
         code: error_code::CDP_NOT_AVAILABLE.to_string(),
         message: format!("{app_name} does not have CDP (Chrome DevTools Protocol) enabled."),
-        suggestion: Some(format!("Run `agent-computer open --with-cdp {app_name}` to relaunch with rich UI support.")),
+        suggestion: Some(format!("Run `agent-desktop open --with-cdp {app_name}` to relaunch with rich UI support.")),
     }
 }
 

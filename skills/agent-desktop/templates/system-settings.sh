@@ -8,27 +8,27 @@ set -euo pipefail
 PANE="${1:?Usage: $0 <setting-pane-name>}"
 
 echo "=== Opening System Settings ==="
-agent-computer open "System Settings"
-agent-computer wait 2500
+agent-desktop open "System Settings"
+agent-desktop wait 2500
 
 echo "=== Taking initial snapshot ==="
-agent-computer snapshot -i
+agent-desktop snapshot -i
 
 echo "=== Searching for '$PANE' ==="
 # Use the search field to navigate to the desired pane
 # Parse snapshot output to find the search field ref, then:
 echo "Find search_field ref from snapshot above, then run:"
-echo "  agent-computer fill @eN \"$PANE\""
-echo "  agent-computer wait 1000"
-echo "  agent-computer snapshot -i"
+echo "  agent-desktop fill @eN \"$PANE\""
+echo "  agent-desktop wait 1000"
+echo "  agent-desktop snapshot -i"
 echo "  # Click the matching result"
-echo "  agent-computer click @eM"
-echo "  agent-computer wait 1000"
-echo "  agent-computer snapshot -i"
+echo "  agent-desktop click @eM"
+echo "  agent-desktop wait 1000"
+echo "  agent-desktop snapshot -i"
 echo "  # Now interact with the setting controls"
 
 echo ""
 echo "=== Taking screenshot for reference ==="
-agent-computer screenshot
+agent-desktop screenshot
 
 echo "=== Done ==="

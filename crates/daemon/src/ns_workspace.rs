@@ -1,7 +1,7 @@
 // NSWorkspace native API module — replaces osascript subprocess calls
 // for app discovery with direct Cocoa API calls via objc2.
 
-use agent_computer_shared::protocol::AppInfo;
+use agent_desktop_shared::protocol::AppInfo;
 use objc2_app_kit::{NSApplicationActivationPolicy, NSRunningApplication, NSWorkspace};
 
 /// Get all running GUI applications using NSWorkspace.shared.runningApplications.

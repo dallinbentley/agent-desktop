@@ -1,36 +1,36 @@
 ---
-name: agent-computer
+name: agent-desktop
 description: macOS desktop automation CLI for AI agents. Use when the user needs to interact with native desktop applications, including clicking buttons, filling text fields, navigating menus, changing system settings, managing files in Finder, automating any macOS app, or any task requiring programmatic desktop control. Triggers include requests to "open an app", "click a button in Finder", "change a system setting", "type in TextEdit", "automate a desktop workflow", "take a screenshot of an app", or any task requiring macOS GUI interaction.
-allowed-tools: Bash(agent-computer:*)
+allowed-tools: Bash(agent-desktop:*)
 ---
 
-# Desktop Automation with agent-computer
+# Desktop Automation with agent-desktop
 
 A CLI tool that lets AI agents control any macOS application through accessibility tree snapshots and simple atomic commands. The desktop equivalent of agent-browser — same ref system, same command grammar, different target.
 
-Install from source: `cargo install --path crates/cli && cargo install --path crates/daemon`. macOS 13+ (Ventura) required. On first run, grant **Accessibility** and **Screen Recording** permissions in System Settings → Privacy & Security. Run `agent-computer status` to verify.
+Install from source: `cargo install --path crates/cli && cargo install --path crates/daemon`. macOS 13+ (Ventura) required. On first run, grant **Accessibility** and **Screen Recording** permissions in System Settings → Privacy & Security. Run `agent-desktop status` to verify.
 
-**Electron/CDP support** is built in — the daemon automatically downloads and bundles [agent-browser](https://github.com/vercel-labs/agent-browser) on first use (cached at `~/.agent-computer/bin/`). No manual install needed. You never call agent-browser directly.
+**Electron/CDP support** is built in — the daemon automatically downloads and bundles [agent-browser](https://github.com/vercel-labs/agent-browser) on first use (cached at `~/.agent-desktop/bin/`). No manual install needed. You never call agent-browser directly.
 
 ## Core Workflow
 
 Every desktop automation follows this pattern:
 
-1. **Open/focus app**: `agent-computer open "TextEdit"`
-2. **Snapshot**: `agent-computer snapshot -i` (get element refs like `@e1`, `@e2`)
+1. **Open/focus app**: `agent-desktop open "TextEdit"`
+2. **Snapshot**: `agent-desktop snapshot -i` (get element refs like `@e1`, `@e2`)
 3. **Interact**: Use refs to click, fill, press keys
 4. **Re-snapshot**: After UI changes (clicking buttons, opening menus, switching views), get fresh refs
 
 ```bash
-agent-computer open "TextEdit"
-agent-computer snapshot -i
+agent-desktop open "TextEdit"
+agent-desktop snapshot -i
 # Output: @e1 button "New", @e2 button "Open", @e3 text_area (editable)
 
-agent-computer click @e3
-agent-computer type @e3 "Hello from agent-computer!"
-agent-computer press cmd+s
-agent-computer wait 1000
-agent-computer snapshot -i  # Check result
+agent-desktop click @e3
+agent-desktop type @e3 "Hello from agent-desktop!"
+agent-desktop press cmd+s
+agent-desktop wait 1000
+agent-desktop snapshot -i  # Check result
 ```
 
 ## Command Chaining
@@ -39,13 +39,13 @@ Commands can be chained with `&&` in a single shell invocation. The daemon persi
 
 ```bash
 # Chain open + wait + snapshot in one call
-agent-computer open "Finder" && agent-computer wait 1000 && agent-computer snapshot -i
+agent-desktop open "Finder" && agent-desktop wait 1000 && agent-desktop snapshot -i
 
 # Chain multiple interactions
-agent-computer click @e3 && agent-computer type @e3 "Hello" && agent-computer press cmd+s
+agent-desktop click @e3 && agent-desktop type @e3 "Hello" && agent-desktop press cmd+s
 
 # Open app and capture
-agent-computer open "System Settings" && agent-computer wait 2000 && agent-computer screenshot
+agent-desktop open "System Settings" && agent-desktop wait 2000 && agent-desktop screenshot
 ```
 
 **When to chain:** Use `&&` when you don't need to read intermediate output before proceeding (e.g., open + wait + screenshot). Run commands separately when you need to parse the output first (e.g., snapshot to discover refs, then interact using those refs).
@@ -54,48 +54,48 @@ agent-computer open "System Settings" && agent-computer wait 2000 && agent-compu
 
 ```bash
 # App management
-agent-computer open "Safari"          # Launch or focus app
-agent-computer open "/path/to/file"   # Open file with default app
-agent-computer open "Spotify" --with-cdp  # Open Electron app with CDP support
-agent-computer close                  # Close frontmost window
+agent-desktop open "Safari"          # Launch or focus app
+agent-desktop open "/path/to/file"   # Open file with default app
+agent-desktop open "Spotify" --with-cdp  # Open Electron app with CDP support
+agent-desktop close                  # Close frontmost window
 
 # Snapshot
-agent-computer snapshot -i            # Interactive elements with refs (recommended)
-agent-computer snapshot -i -d 15      # Deeper tree traversal (default depth: 10)
-agent-computer snapshot -i -c         # Compact output (collapse containers)
-agent-computer snapshot -i --app "Finder"  # Snapshot specific app (default: frontmost)
+agent-desktop snapshot -i            # Interactive elements with refs (recommended)
+agent-desktop snapshot -i -d 15      # Deeper tree traversal (default depth: 10)
+agent-desktop snapshot -i -c         # Compact output (collapse containers)
+agent-desktop snapshot -i --app "Finder"  # Snapshot specific app (default: frontmost)
 
 # Interaction (use @refs from snapshot)
-agent-computer click @e1              # Click element
-agent-computer click @e1 --double     # Double-click
-agent-computer click @e1 --right      # Right-click (context menu)
-agent-computer click 500 300          # Click absolute coordinates (fallback)
-agent-computer fill @e2 "text"        # Clear and type text
-agent-computer type @e2 "text"        # Type without clearing
-agent-computer type "text"            # Type into focused element (no ref)
-agent-computer press enter            # Press key
-agent-computer press cmd+c            # Key combo (cmd, shift, alt/option, ctrl)
-agent-computer press cmd+shift+s      # Multiple modifiers
-agent-computer scroll down            # Scroll (default: 300px)
-agent-computer scroll up 500          # Scroll with custom amount
+agent-desktop click @e1              # Click element
+agent-desktop click @e1 --double     # Double-click
+agent-desktop click @e1 --right      # Right-click (context menu)
+agent-desktop click 500 300          # Click absolute coordinates (fallback)
+agent-desktop fill @e2 "text"        # Clear and type text
+agent-desktop type @e2 "text"        # Type without clearing
+agent-desktop type "text"            # Type into focused element (no ref)
+agent-desktop press enter            # Press key
+agent-desktop press cmd+c            # Key combo (cmd, shift, alt/option, ctrl)
+agent-desktop press cmd+shift+s      # Multiple modifiers
+agent-desktop scroll down            # Scroll (default: 300px)
+agent-desktop scroll up 500          # Scroll with custom amount
 
 # Get information
-agent-computer get text @e1           # Get element text
-agent-computer get title              # Get frontmost window title
-agent-computer get apps               # List running GUI applications
-agent-computer get windows            # List all windows
+agent-desktop get text @e1           # Get element text
+agent-desktop get title              # Get frontmost window title
+agent-desktop get apps               # List running GUI applications
+agent-desktop get windows            # List all windows
 
 # Wait
-agent-computer wait @e1               # Wait for element to appear
-agent-computer wait 2000              # Wait milliseconds
+agent-desktop wait @e1               # Wait for element to appear
+agent-desktop wait 2000              # Wait milliseconds
 
 # Capture
-agent-computer screenshot             # Capture frontmost window
-agent-computer screenshot --full      # Capture entire screen
-agent-computer screenshot --app "Finder"  # Capture specific app's window
+agent-desktop screenshot             # Capture frontmost window
+agent-desktop screenshot --full      # Capture entire screen
+agent-desktop screenshot --app "Finder"  # Capture specific app's window
 
 # Status
-agent-computer status                 # Daemon health, permissions, frontmost app
+agent-desktop status                 # Daemon health, permissions, frontmost app
 ```
 
 ## Common Patterns
@@ -103,77 +103,77 @@ agent-computer status                 # Daemon health, permissions, frontmost ap
 ### Open an App and Interact
 
 ```bash
-agent-computer open "TextEdit"
-agent-computer wait 1000
-agent-computer snapshot -i
+agent-desktop open "TextEdit"
+agent-desktop wait 1000
+agent-desktop snapshot -i
 # @e1 button "New", @e2 button "Open", @e3 text_area (editable)
-agent-computer click @e3
-agent-computer type @e3 "Meeting notes for today..."
-agent-computer press cmd+s
-agent-computer wait 1000
-agent-computer screenshot
+agent-desktop click @e3
+agent-desktop type @e3 "Meeting notes for today..."
+agent-desktop press cmd+s
+agent-desktop wait 1000
+agent-desktop screenshot
 ```
 
 ### Navigate Finder
 
 ```bash
-agent-computer open "Finder"
-agent-computer snapshot -i
+agent-desktop open "Finder"
+agent-desktop snapshot -i
 # @e1 toolbar_button "Back", @e2 search_field "Search", @e3 icon "Documents" (folder)
-agent-computer click @e3 --double
-agent-computer wait 1000
-agent-computer snapshot -i
+agent-desktop click @e3 --double
+agent-desktop wait 1000
+agent-desktop snapshot -i
 # New refs after navigation
-agent-computer click @e5 --double  # Open a file
+agent-desktop click @e5 --double  # Open a file
 ```
 
 ### Change System Settings
 
 ```bash
-agent-computer open "System Settings"
-agent-computer wait 2000
-agent-computer snapshot -i
+agent-desktop open "System Settings"
+agent-desktop wait 2000
+agent-desktop snapshot -i
 # @e1 search_field "Search", @e2 button "General", @e3 button "Appearance"
-agent-computer click @e3
-agent-computer wait 1000
-agent-computer snapshot -i
+agent-desktop click @e3
+agent-desktop wait 1000
+agent-desktop snapshot -i
 # @e4 radio "Light", @e5 radio "Dark", @e6 radio "Auto"
-agent-computer click @e5
-agent-computer screenshot
+agent-desktop click @e5
+agent-desktop screenshot
 ```
 
 ### Multi-App Workflow (Copy Between Apps)
 
 ```bash
 # Copy from Safari
-agent-computer open "Safari"
-agent-computer snapshot -i --app "Safari"
-agent-computer click @e3
-agent-computer press cmd+a
-agent-computer press cmd+c
+agent-desktop open "Safari"
+agent-desktop snapshot -i --app "Safari"
+agent-desktop click @e3
+agent-desktop press cmd+a
+agent-desktop press cmd+c
 
 # Paste into TextEdit
-agent-computer open "TextEdit"
-agent-computer snapshot -i --app "TextEdit"
-agent-computer click @e4
-agent-computer press cmd+v
-agent-computer press cmd+s
+agent-desktop open "TextEdit"
+agent-desktop snapshot -i --app "TextEdit"
+agent-desktop click @e4
+agent-desktop press cmd+v
+agent-desktop press cmd+s
 ```
 
 ### Menu Navigation
 
 ```bash
-agent-computer open "TextEdit"
-agent-computer snapshot -i
+agent-desktop open "TextEdit"
+agent-desktop snapshot -i
 # @e5 menu "File", @e6 menu "Edit", @e7 menu "Format"
-agent-computer click @e5
-agent-computer wait 500
-agent-computer snapshot -i
+agent-desktop click @e5
+agent-desktop wait 500
+agent-desktop snapshot -i
 # Menu is now open — new refs for menu items
 # @e10 menu_item "New", @e11 menu_item "Open...", @e12 menu_item "Save"
-agent-computer click @e11
-agent-computer wait 1000
-agent-computer snapshot -i  # File picker dialog
+agent-desktop click @e11
+agent-desktop wait 1000
+agent-desktop snapshot -i  # File picker dialog
 ```
 
 ### Coordinate Fallback (Poor Accessibility)
@@ -181,11 +181,11 @@ agent-computer snapshot -i  # File picker dialog
 For apps with incomplete accessibility trees (games, canvas-based apps, some Electron apps):
 
 ```bash
-agent-computer screenshot
+agent-desktop screenshot
 # Visually identify the target area from screenshot
-agent-computer click 500 300
-agent-computer wait 1000
-agent-computer screenshot  # Verify result
+agent-desktop click 500 300
+agent-desktop wait 1000
+agent-desktop screenshot  # Verify result
 ```
 
 ### Electron Apps with CDP
@@ -194,13 +194,13 @@ The daemon auto-downloads agent-browser on first CDP use — no manual install n
 
 ```bash
 # Launch with Chrome DevTools Protocol for richer inspection
-agent-computer open "Spotify" --with-cdp
-agent-computer wait 2000
-agent-computer snapshot -i
+agent-desktop open "Spotify" --with-cdp
+agent-desktop wait 2000
+agent-desktop snapshot -i
 # CDP-enhanced snapshot with web-level detail — refs from both native chrome
 # and web content are unified into a single ref map
-agent-computer click @e5
-agent-computer screenshot
+agent-desktop click @e5
+agent-desktop screenshot
 ```
 
 ### App Targeting (Background Interaction)
@@ -209,22 +209,22 @@ Use `--app` to interact with a specific app without switching focus:
 
 ```bash
 # Snapshot a specific app
-agent-computer snapshot -i --app "Finder"
+agent-desktop snapshot -i --app "Finder"
 
 # Send keys to a specific app
-agent-computer press cmd+n --app "TextEdit"
+agent-desktop press cmd+n --app "TextEdit"
 
 # Screenshot a specific app's window
-agent-computer screenshot --app "Safari"
+agent-desktop screenshot --app "Safari"
 ```
 
 ## Architecture
 
 ```
-agent-computer (CLI)  ──Unix Socket──▶  agent-computer-daemon  ──▶  macOS APIs
+agent-desktop (CLI)  ──Unix Socket──▶  agent-desktop-daemon  ──▶  macOS APIs
    (stateless)            IPC             (persistent)              AXUIElement
                        JSON over          • Ref map management      CGEvent
-                    ~/.agent-computer/    • Element cache            ScreenCaptureKit
+                    ~/.agent-desktop/    • Element cache            ScreenCaptureKit
                        daemon.sock       • Tree traversal           NSWorkspace
                                          • Browser bridge ─────▶  agent-browser
                                            (optional, for             (subprocess)
@@ -234,8 +234,8 @@ agent-computer (CLI)  ──Unix Socket──▶  agent-computer-daemon  ──�
 - The **CLI** is stateless — it serializes commands as JSON and sends them over a Unix socket
 - The **daemon** runs in the background, maintaining element references, caching accessibility trees, and routing commands
 - The daemon **auto-starts** when you run any CLI command — no manual setup needed
-- Both binaries (`agent-computer` and `agent-computer-daemon`) must be on your PATH
-- For **Electron/CDP apps**, the daemon internally delegates to [agent-browser](https://github.com/vercel-labs/agent-browser) via subprocess. It auto-downloads the correct platform binary on first use (pinned to a known-good version) and caches it at `~/.agent-computer/bin/`. You never call agent-browser directly — all interaction goes through `agent-computer` commands, and the daemon handles routing transparently. If auto-download fails (no network), it falls back to any agent-browser found in PATH
+- Both binaries (`agent-desktop` and `agent-desktop-daemon`) must be on your PATH
+- For **Electron/CDP apps**, the daemon internally delegates to [agent-browser](https://github.com/vercel-labs/agent-browser) via subprocess. It auto-downloads the correct platform binary on first use (pinned to a known-good version) and caches it at `~/.agent-desktop/bin/`. You never call agent-browser directly — all interaction goes through `agent-desktop` commands, and the daemon handles routing transparently. If auto-download fails (no network), it falls back to any agent-browser found in PATH
 
 ## Snapshot Output Format
 
@@ -304,18 +304,18 @@ Refs (`@e1`, `@e2`, etc.) are invalidated when the UI changes. Always re-snapsho
 - Any navigation that updates the UI
 
 ```bash
-agent-computer click @e5             # Opens a menu
-agent-computer snapshot -i           # MUST re-snapshot — old refs are stale
-agent-computer click @e10            # Use new refs from fresh snapshot
+agent-desktop click @e5             # Opens a menu
+agent-desktop snapshot -i           # MUST re-snapshot — old refs are stale
+agent-desktop click @e10            # Use new refs from fresh snapshot
 ```
 
 ## Permissions and Setup
 
 ```bash
 # Check status
-agent-computer status
+agent-desktop status
 # Output:
-# agent-computer daemon
+# agent-desktop daemon
 #   PID: 12345
 #   Accessibility: ✅ granted
 #   Screen Recording: ✅ granted
@@ -329,7 +329,7 @@ If permissions show ❌:
 1. Open **System Settings → Privacy & Security → Accessibility**
 2. Add and enable your terminal app (Terminal.app, iTerm2, Warp, etc.)
 3. Repeat for **Screen Recording** if screenshots fail
-4. Run `agent-computer status` to verify
+4. Run `agent-desktop status` to verify
 
 ## Timeouts and Slow Apps
 
@@ -337,22 +337,22 @@ The default snapshot timeout is 3 seconds with partial results returned on timeo
 
 ```bash
 # Wait for app to load before snapshotting
-agent-computer wait 2000
-agent-computer snapshot -i
+agent-desktop wait 2000
+agent-desktop snapshot -i
 
 # Reduce depth for faster snapshots on complex apps
-agent-computer snapshot -i -d 5
+agent-desktop snapshot -i -d 5
 
 # Wait for a specific element to appear
-agent-computer wait @e1
+agent-desktop wait @e1
 
 # Use --timeout for longer operations
-agent-computer snapshot -i --timeout 10000
+agent-desktop snapshot -i --timeout 10000
 ```
 
 ## Error Handling
 
-agent-computer provides AI-friendly error messages with recovery suggestions:
+agent-desktop provides AI-friendly error messages with recovery suggestions:
 
 | Error | Message |
 |---|---|
@@ -370,7 +370,7 @@ In `--json` mode, errors include machine-parseable codes:
 
 ## Comparison with agent-browser
 
-| | agent-browser | agent-computer |
+| | agent-browser | agent-desktop |
 |---|---|---|
 | **Target** | Web pages (Chromium) | Any macOS app |
 | **Entry point** | `open <url>` | `open <app-name>` |
@@ -381,7 +381,7 @@ In `--json` mode, errors include machine-parseable codes:
 | **Daemon** | Node.js process | Rust daemon process |
 | **Command grammar** | `click`, `fill`, `type`, `press`, `scroll` | Same grammar + app management |
 
-The command grammar is intentionally identical — if you know agent-browser, you know agent-computer.
+The command grammar is intentionally identical — if you know agent-browser, you know agent-desktop.
 
 ## Deep-Dive Documentation
 

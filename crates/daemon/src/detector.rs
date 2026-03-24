@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use agent_computer_shared::types::{AppKind, KNOWN_BROWSER_BUNDLE_IDS};
+use agent_desktop_shared::types::{AppKind, KNOWN_BROWSER_BUNDLE_IDS};
 
 use crate::refmap::InteractionRoute;
 
@@ -418,7 +418,7 @@ mod tests {
     #[test]
     fn test_interaction_routing() {
         use crate::refmap::InteractionRoute;
-        use agent_computer_shared::types::{ElementRef, RefSource};
+        use agent_desktop_shared::types::{ElementRef, RefSource};
 
         let ax_route = InteractionRoute::AX {
             pid: 123,

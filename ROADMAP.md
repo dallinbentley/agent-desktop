@@ -1,4 +1,4 @@
-# agent-computer — Project Roadmap
+# agent-desktop — Project Roadmap
 
 > A CLI tool for AI agents to control macOS desktops efficiently, inspired by [agent-browser](https://github.com/anthropics/agent-browser).
 
@@ -6,7 +6,7 @@
 
 ## 1. Project Vision
 
-**agent-computer** is to the desktop what agent-browser is to the web — a lightweight, text-first CLI tool that lets AI agents observe and interact with any macOS application through compact accessibility tree snapshots and simple atomic commands.
+**agent-desktop** is to the desktop what agent-browser is to the web — a lightweight, text-first CLI tool that lets AI agents observe and interact with any macOS application through compact accessibility tree snapshots and simple atomic commands.
 
 ### The Core Insight
 
@@ -64,9 +64,9 @@ Derived from agent-browser's design strengths:
                                             └──────────────────┘
 ```
 
-### 3.2 Concept Mapping: agent-browser → agent-computer
+### 3.2 Concept Mapping: agent-browser → agent-desktop
 
-| agent-browser | agent-computer | Implementation |
+| agent-browser | agent-desktop | Implementation |
 |---------------|----------------|----------------|
 | Browser DOM/Accessibility tree | macOS Accessibility tree | AXUIElement API |
 | `open <url>` | `open <app>` / `focus <window>` | NSWorkspace / AX API |
@@ -123,7 +123,7 @@ Derived from agent-browser's design strengths:
 
 ### 3.4 IPC Protocol Contract (CLI ↔ Daemon)
 
-Communication is over a Unix domain socket at `~/.agent-computer/daemon.sock`. Messages are **newline-delimited JSON** (one JSON object per line).
+Communication is over a Unix domain socket at `~/.agent-desktop/daemon.sock`. Messages are **newline-delimited JSON** (one JSON object per line).
 
 #### Request Format (CLI → Daemon)
 ```json
@@ -232,7 +232,7 @@ Full accessibility tree traversal is known to be slow (1-30s for complex apps). 
 
 ## 4. Command Design
 
-### Grammar: `agent-computer <command> [args] [options]`
+### Grammar: `agent-desktop <command> [args] [options]`
 
 ### Full Command Set
 
@@ -301,7 +301,7 @@ Full accessibility tree traversal is known to be slow (1-30s for complex apps). 
 ### Primary: Swift CLI with Embedded Daemon
 
 ```
-agent-computer/
+agent-desktop/
 ├── Sources/
 │   ├── CLI/              # Swift CLI (thin client)
 │   │   ├── main.swift    # Entry point, argument parsing
@@ -345,7 +345,7 @@ agent-computer/
 ### Build & Distribution
 - Swift Package Manager for builds
 - Single static binary output
-- `brew install agent-computer` (eventual goal)
+- `brew install agent-desktop` (eventual goal)
 - Minimum macOS 13 (Ventura) for ScreenCaptureKit features
 
 ---
@@ -357,13 +357,13 @@ agent-computer/
 **Goal:** An agent can observe a Mac app and interact with basic elements.
 
 ```
-agent-computer snapshot -i          ✅ See interactive elements with @refs
-agent-computer click @e3            ✅ Click a button/link
-agent-computer type @e3 "hello"     ✅ Type into a text field
-agent-computer press Enter          ✅ Press a key
-agent-computer screenshot           ✅ Take a screenshot
-agent-computer open "Safari"        ✅ Focus/launch an app
-agent-computer status               ✅ Check daemon health + permissions
+agent-desktop snapshot -i          ✅ See interactive elements with @refs
+agent-desktop click @e3            ✅ Click a button/link
+agent-desktop type @e3 "hello"     ✅ Type into a text field
+agent-desktop press Enter          ✅ Press a key
+agent-desktop screenshot           ✅ Take a screenshot
+agent-desktop open "Safari"        ✅ Focus/launch an app
+agent-desktop status               ✅ Check daemon health + permissions
 ```
 
 **Implementation priorities:**
@@ -489,10 +489,10 @@ Developer A (daemon/native):     Developer B (CLI/protocol):
 ---
 
 **T0: Swift Package Setup + Skeleton**
-- Create `Package.swift` with targets: `agent-computer` (CLI executable), `agent-computer-daemon` (daemon executable), `AgentComputerShared` (library)
+- Create `Package.swift` with targets: `agent-desktop` (CLI executable), `agent-desktop-daemon` (daemon executable), `AgentComputerShared` (library)
 - Add `swift-argument-parser` dependency
 - Scaffold directory structure matching Section 5
-- Both `swift build` and `swift run agent-computer --help` work
+- Both `swift build` and `swift run agent-desktop --help` work
 - **AC:** `swift build` succeeds, produces two binaries, `--help` prints usage
 
 ---
@@ -541,12 +541,12 @@ Developer A (daemon/native):     Developer B (CLI/protocol):
 - `--json` global flag
 - `--timeout` global flag (default 5000ms)
 - `--verbose` global flag
-- **AC:** `agent-computer snapshot -i` parses correctly, `agent-computer click @e3` extracts ref "e3", `agent-computer press cmd+shift+s` parses modifier combo, invalid commands print helpful usage
+- **AC:** `agent-desktop snapshot -i` parses correctly, `agent-desktop click @e3` extracts ref "e3", `agent-desktop press cmd+shift+s` parses modifier combo, invalid commands print helpful usage
 
 ---
 
 **T3: Daemon Socket Server**
-- Create Unix domain socket at `~/.agent-computer/daemon.sock`
+- Create Unix domain socket at `~/.agent-desktop/daemon.sock`
 - Listen for connections, read newline-delimited JSON commands
 - Dispatch to handler (stub handlers that return mock responses initially)
 - Handle concurrent connections (one at a time is fine for MVP — serial queue)
@@ -558,7 +558,7 @@ Developer A (daemon/native):     Developer B (CLI/protocol):
 ---
 
 **T4: CLI Socket Client**
-- Connect to `~/.agent-computer/daemon.sock`
+- Connect to `~/.agent-desktop/daemon.sock`
 - If daemon not running, spawn it as background process and retry connection (with 3s timeout)
 - Send command as JSON, read response
 - Format response for human output (colored text) or `--json` (raw JSON)
@@ -686,9 +686,9 @@ class RefMap {
   | Error | Message |
   |-------|---------|
   | Ref not found | "Element @e3 not found. The UI may have changed. Run `snapshot` to refresh element references." |
-  | No permission | "Accessibility permission required. Run `agent-computer setup` to grant access." |
+  | No permission | "Accessibility permission required. Run `agent-desktop setup` to grant access." |
   | App not found | "Application 'X' not found. Running apps: Safari, Finder, TextEdit. Did you mean 'Y'?" |
-  | Daemon not running | "Starting agent-computer daemon..." (auto-start) |
+  | Daemon not running | "Starting agent-desktop daemon..." (auto-start) |
   | Timeout | "Snapshot timed out after 3s. Returning partial results (15 of ~40 elements). Try `snapshot -d 5` to reduce depth." |
   | No refs available | "No element references available. Run `snapshot -i` first to discover interactive elements." |
 - Non-zero exit codes for all failures
@@ -698,9 +698,9 @@ class RefMap {
 ---
 
 **T12: Status Command + Permission Checks**
-- `agent-computer status` returns:
+- `agent-desktop status` returns:
   ```
-  agent-computer daemon: running (pid 12345)
+  agent-desktop daemon: running (pid 12345)
   Accessibility permission: ✅ granted
   Screen Recording permission: ✅ granted
   Frontmost app: Finder (pid 456)
@@ -716,14 +716,14 @@ class RefMap {
 
 **T13: E2E Integration Tests**
 - Test script that exercises the full flow:
-  1. `agent-computer open "TextEdit"` → verify TextEdit is frontmost
-  2. `agent-computer snapshot -i` → verify output contains text_area and menu refs
-  3. `agent-computer click @e<text_area_ref>` → verify text area is focused
-  4. `agent-computer type @e<ref> "Hello from agent-computer!"` → verify text appears
-  5. `agent-computer screenshot` → verify PNG file exists
-  6. `agent-computer press cmd+a` → select all
-  7. `agent-computer press cmd+c` → copy
-  8. `agent-computer status` → verify all green
+  1. `agent-desktop open "TextEdit"` → verify TextEdit is frontmost
+  2. `agent-desktop snapshot -i` → verify output contains text_area and menu refs
+  3. `agent-desktop click @e<text_area_ref>` → verify text area is focused
+  4. `agent-desktop type @e<ref> "Hello from agent-desktop!"` → verify text appears
+  5. `agent-desktop screenshot` → verify PNG file exists
+  6. `agent-desktop press cmd+a` → select all
+  7. `agent-desktop press cmd+c` → copy
+  8. `agent-desktop status` → verify all green
 - Can be run as a Swift test target or shell script
 - **AC:** Full script runs end-to-end without manual intervention. TextEdit ends up with typed text visible.
 
@@ -818,7 +818,7 @@ These are unknowns that should be resolved in the first 2-3 days before committi
 - **Linux support** — AT-SPI for accessibility tree, XDotool/Ydotool for input, grim/Flameshot for screenshots
 - **Windows support** — UI Automation API for accessibility, SendInput for events
 - **MCP server mode** — Expose as Model Context Protocol tool server
-- **pi integration** — First-class `agent-computer` tool in pi (like `agent-browser` tool today)
+- **pi integration** — First-class `agent-desktop` tool in pi (like `agent-browser` tool today)
 - **Playwright-style recording** — Record user actions → generate command scripts
 - **Visual grounding fallback** — Integration with vision models (e.g., ShowUI) for elements not in accessibility tree
 
@@ -856,10 +856,10 @@ These are unknowns that should be resolved in the first 2-3 days before committi
 ### Challenge 4: Permission UX
 **Problem:** Requires two system permissions (Accessibility + Screen Recording) that users must grant manually.
 **Mitigations:**
-- `agent-computer status` shows permission state clearly
+- `agent-desktop status` shows permission state clearly
 - First-run wizard with step-by-step instructions
-- `agent-computer setup` command to open System Settings to the right pane
-- Clear error messages: "Accessibility permission required. Run `agent-computer setup` for instructions."
+- `agent-desktop setup` command to open System Settings to the right pane
+- Clear error messages: "Accessibility permission required. Run `agent-desktop setup` for instructions."
 
 ### Challenge 5: Dynamic/Modal UI State
 **Problem:** Menus, dialogs, sheets, and popups appear/disappear dynamically.
@@ -882,7 +882,7 @@ These are unknowns that should be resolved in the first 2-3 days before committi
 ## 8. Success Criteria
 
 ### MVP (Phase 1) is successful when:
-- [ ] An AI agent can open TextEdit, type a document, save it — entirely via `agent-computer` commands
+- [ ] An AI agent can open TextEdit, type a document, save it — entirely via `agent-desktop` commands
 - [ ] An AI agent can navigate Finder, find a file, and open it
 - [ ] An AI agent can change a System Settings preference
 - [ ] Snapshot-to-action latency < 2 seconds for typical apps

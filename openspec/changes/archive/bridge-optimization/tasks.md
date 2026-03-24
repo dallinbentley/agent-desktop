@@ -10,11 +10,11 @@
 ## 2. Bundle agent-browser binary (browser_bridge.rs)
 
 - [x] 2.1 Add `AGENT_BROWSER_VERSION` constant (pin to current version, e.g., "0.22.1").
-- [x] 2.2 Update `detect_binary()` to check `~/.agent-computer/bin/agent-browser` first, before PATH and nvm paths.
-- [x] 2.3 Add `download_binary()` function: detect platform (darwin-arm64, darwin-x64, linux-x64, etc.), download from npm registry (`https://registry.npmjs.org/agent-browser/-/agent-browser-{version}.tgz`), extract the platform binary, chmod +x, save to `~/.agent-computer/bin/agent-browser`.
+- [x] 2.2 Update `detect_binary()` to check `~/.agent-desktop/bin/agent-browser` first, before PATH and nvm paths.
+- [x] 2.3 Add `download_binary()` function: detect platform (darwin-arm64, darwin-x64, linux-x64, etc.), download from npm registry (`https://registry.npmjs.org/agent-browser/-/agent-browser-{version}.tgz`), extract the platform binary, chmod +x, save to `~/.agent-desktop/bin/agent-browser`.
 - [x] 2.4 Call `download_binary()` from `detect_binary()` when no binary found. Log progress to stderr.
 - [x] 2.5 After download, run `agent-browser install` to download Chrome for Testing (required by agent-browser on first use).
-- [x] 2.6 Add `--install-browser` CLI command to agent-computer that triggers manual download/install of agent-browser + Chrome.
+- [x] 2.6 Add `--install-browser` CLI command to agent-desktop that triggers manual download/install of agent-browser + Chrome.
 
 ## 3. Pre-warm CDP sessions (main.rs, app.rs)
 

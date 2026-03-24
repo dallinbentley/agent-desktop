@@ -1,6 +1,6 @@
 ## Why
 
-agent-computer has 61 unit tests but zero integration or E2E tests. The unit tests only cover isolated module internals (parsing, ref maps, detection). Nothing validates that the CLI→daemon IPC pipeline works end-to-end, that commands actually perform their actions on real apps, or that error paths produce correct output. We cannot confidently ship or refactor without integration coverage.
+agent-desktop has 61 unit tests but zero integration or E2E tests. The unit tests only cover isolated module internals (parsing, ref maps, detection). Nothing validates that the CLI→daemon IPC pipeline works end-to-end, that commands actually perform their actions on real apps, or that error paths produce correct output. We cannot confidently ship or refactor without integration coverage.
 
 ## What Changes
 

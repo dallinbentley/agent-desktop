@@ -8,7 +8,7 @@ Added instrumentation to the AX tree walk (`ax_engine.rs`) to measure:
 - Total elements visited
 - Wall-clock duration
 
-Results collected via `agent-computer snapshot -i --verbose --app <name>`.
+Results collected via `agent-desktop snapshot -i --verbose --app <name>`.
 
 ## Per-App Breakdown
 

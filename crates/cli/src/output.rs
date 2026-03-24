@@ -1,5 +1,5 @@
-use agent_computer_shared::protocol::*;
-use agent_computer_shared::types::ErrorInfo;
+use agent_desktop_shared::protocol::*;
+use agent_desktop_shared::types::ErrorInfo;
 
 // MARK: - ANSI Colors
 
@@ -195,7 +195,7 @@ fn print_wait(data: &WaitData) {
 }
 
 fn print_status(data: &StatusData) {
-    println!("{BOLD}agent-computer daemon{RESET}");
+    println!("{BOLD}agent-desktop daemon{RESET}");
     println!("  PID: {}", data.daemon_pid);
 
     let ax_status = if data.accessibility_permission {

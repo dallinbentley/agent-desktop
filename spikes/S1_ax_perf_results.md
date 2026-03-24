@@ -83,7 +83,7 @@ All times are median of 3 iterations.
 4. **Interactive-only pruning**: Modest benefit — most nodes still need to be visited to check role
 5. **Caching/diffing**: Essential for repeated snapshots — UI doesn't change between rapid polls
 
-### 4. Recommended Approach for agent-computer
+### 4. Recommended Approach for agent-desktop
 1. **Default depth limit**: 10 (captures nearly all UI in standard apps)
 2. **Two-pass approach**: First pass minimal (get tree structure + roles), second pass selective (extract attributes only for interactive elements)
 3. **Target budget**: < 100ms for snapshot generation

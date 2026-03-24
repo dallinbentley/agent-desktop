@@ -5,7 +5,7 @@ The daemon and CLI SHALL support an `AGENT_COMPUTER_SOCKET` environment variable
 
 #### Scenario: Custom socket path via env var
 - **WHEN** `AGENT_COMPUTER_SOCKET=/tmp/test-123.sock` is set
-- **THEN** the daemon listens on `/tmp/test-123.sock` instead of `~/.agent-computer/daemon.sock`
+- **THEN** the daemon listens on `/tmp/test-123.sock` instead of `~/.agent-desktop/daemon.sock`
 - **THEN** the CLI connects to `/tmp/test-123.sock`
 
 ### Requirement: TestDaemon helper

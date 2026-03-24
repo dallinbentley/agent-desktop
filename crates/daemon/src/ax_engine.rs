@@ -4,7 +4,7 @@
 // Uses raw FFI to ApplicationServices for AXUIElement APIs,
 // plus core-foundation for CF types.
 
-use agent_computer_shared::types::{ElementRef, PathSegment, Rect, RefSource, INTERACTIVE_ROLES};
+use agent_desktop_shared::types::{ElementRef, PathSegment, Rect, RefSource, INTERACTIVE_ROLES};
 use core_foundation::array::{CFArray, CFArrayRef};
 use core_foundation::base::{CFTypeID, CFTypeRef, TCFType};
 use core_foundation::string::{CFString, CFStringRef};

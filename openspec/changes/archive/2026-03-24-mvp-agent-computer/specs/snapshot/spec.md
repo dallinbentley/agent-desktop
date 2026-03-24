@@ -4,15 +4,15 @@
 The system SHALL traverse the macOS accessibility tree (AXUIElement) for the frontmost application's frontmost window, extracting element role, title, description, frame, and available actions.
 
 #### Scenario: Snapshot of a simple app
-- **WHEN** user runs `agent-computer snapshot -i` with TextEdit as frontmost app
+- **WHEN** user runs `agent-desktop snapshot -i` with TextEdit as frontmost app
 - **THEN** system traverses the accessibility tree and returns interactive elements with roles and labels
 
 #### Scenario: Snapshot with app targeting
-- **WHEN** user runs `agent-computer snapshot -i --app "Finder"`
+- **WHEN** user runs `agent-desktop snapshot -i --app "Finder"`
 - **THEN** system traverses Finder's accessibility tree regardless of which app is frontmost
 
 #### Scenario: Snapshot respects depth limit
-- **WHEN** user runs `agent-computer snapshot -i -d 5`
+- **WHEN** user runs `agent-desktop snapshot -i -d 5`
 - **THEN** system traverses no deeper than 5 levels and returns elements found within that depth
 
 #### Scenario: Snapshot times out gracefully
@@ -23,7 +23,7 @@ The system SHALL traverse the macOS accessibility tree (AXUIElement) for the fro
 The system SHALL filter the accessibility tree to include only interactive element roles: AXButton, AXTextField, AXTextArea, AXCheckBox, AXRadioButton, AXPopUpButton, AXComboBox, AXSlider, AXLink, AXMenuItem, AXMenuButton, AXTab, AXTabGroup, AXScrollArea, AXTable, AXOutline, AXSwitch, AXSearchField, AXIncrementor.
 
 #### Scenario: Non-interactive elements excluded
-- **WHEN** user runs `agent-computer snapshot -i` on an app with static text, images, and buttons
+- **WHEN** user runs `agent-desktop snapshot -i` on an app with static text, images, and buttons
 - **THEN** only elements with interactive roles receive @refs; static text and images are excluded from ref assignment
 
 ### Requirement: Assign sequential @refs to interactive elements

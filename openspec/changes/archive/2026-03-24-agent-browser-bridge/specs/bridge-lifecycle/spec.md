@@ -22,7 +22,7 @@ Each Electron/browser app SHALL get its own agent-browser session via `--session
 The `open --with-cdp` command SHALL detect Electron apps, quit the running instance, relaunch with `--remote-debugging-port=<port>`, and wait for CDP to be ready. The assigned port SHALL be tracked in daemon state and passed to agent-browser.
 
 #### Scenario: Launch Spotify with CDP
-- **WHEN** `agent-computer open --with-cdp Spotify`
+- **WHEN** `agent-desktop open --with-cdp Spotify`
 - **THEN** Spotify relaunches with CDP on deterministic port, daemon records port, subsequent snapshots use agent-browser
 
 ### Requirement: Clean shutdown closes agent-browser sessions

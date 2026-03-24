@@ -1,14 +1,14 @@
 [package]
-name = "agent-computer-cli"
+name = "agent-desktop-cli"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "agent-computer"
+name = "agent-desktop"
 path = "src/main.rs"
 
 [dependencies]
-agent-computer-shared = { path = "../shared" }
+agent-desktop-shared = { path = "../shared" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 clap = { workspace = true }

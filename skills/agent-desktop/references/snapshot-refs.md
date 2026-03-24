@@ -22,7 +22,7 @@ Traditional screenshot approach:
 Screenshot → Vision model parses → Guess coordinates → Action (~1500-3000 tokens, fragile)
 ```
 
-agent-computer approach:
+agent-desktop approach:
 ```
 Compact accessibility snapshot → @refs assigned → Direct interaction (~200-400 tokens, deterministic)
 ```
@@ -33,12 +33,12 @@ The snapshot system maps the macOS accessibility tree to a compact text represen
 
 ```bash
 # Interactive snapshot — RECOMMENDED default
-agent-computer snapshot -i
+agent-desktop snapshot -i
 
 # With options
-agent-computer snapshot -i -d 15      # Deeper traversal
-agent-computer snapshot -i -c         # Compact output
-agent-computer snapshot -i --app "Finder"  # Target specific app
+agent-desktop snapshot -i -d 15      # Deeper traversal
+agent-desktop snapshot -i -c         # Compact output
+agent-desktop snapshot -i --app "Finder"  # Target specific app
 ```
 
 ### Snapshot Output Format
@@ -97,16 +97,16 @@ Once you have refs from a snapshot, interact directly:
 
 ```bash
 # Click a button
-agent-computer click @e1
+agent-desktop click @e1
 
 # Fill a text field (clear + type)
-agent-computer fill @e4 "Hello World"
+agent-desktop fill @e4 "Hello World"
 
 # Type without clearing
-agent-computer type @e4 "additional text"
+agent-desktop type @e4 "additional text"
 
 # Get element text
-agent-computer get text @e4
+agent-desktop get text @e4
 ```
 
 ## Ref Lifecycle
@@ -128,18 +128,18 @@ agent-computer get text @e4
 ### Safe Pattern
 
 ```bash
-agent-computer snapshot -i           # Take snapshot → get refs
-agent-computer click @e5             # Act on ref
-agent-computer snapshot -i           # ALWAYS re-snapshot after action
-agent-computer click @e10            # Use new refs
+agent-desktop snapshot -i           # Take snapshot → get refs
+agent-desktop click @e5             # Act on ref
+agent-desktop snapshot -i           # ALWAYS re-snapshot after action
+agent-desktop click @e10            # Use new refs
 ```
 
 ### Unsafe Pattern (Common Mistake)
 
 ```bash
-agent-computer snapshot -i           # Take snapshot
-agent-computer click @e5             # Opens a new view
-agent-computer click @e3             # ❌ WRONG — @e3 from old snapshot, may be stale
+agent-desktop snapshot -i           # Take snapshot
+agent-desktop click @e5             # Opens a new view
+agent-desktop click @e3             # ❌ WRONG — @e3 from old snapshot, may be stale
 ```
 
 ## Ref Resolution
@@ -163,9 +163,9 @@ Suggestion: Run `snapshot` to refresh element references.
 Never guess refs. Always snapshot first to discover what's available.
 
 ```bash
-agent-computer open "Finder"
-agent-computer wait 1000
-agent-computer snapshot -i   # Discover available elements
+agent-desktop open "Finder"
+agent-desktop wait 1000
+agent-desktop snapshot -i   # Discover available elements
 ```
 
 ### 2. Re-Snapshot After Every Significant Action
@@ -177,8 +177,8 @@ Any action that changes the UI (clicking, opening menus, switching tabs) invalid
 Apps like Xcode, VS Code, or Slack have deep accessibility trees. Use `-d 5` for faster results when you only need top-level elements.
 
 ```bash
-agent-computer snapshot -i -d 5   # Faster, less detail
-agent-computer snapshot -i -d 20  # Slower, more detail
+agent-desktop snapshot -i -d 5   # Faster, less detail
+agent-desktop snapshot -i -d 20  # Slower, more detail
 ```
 
 ### 4. Use `--app` for Multi-App Workflows
@@ -186,8 +186,8 @@ agent-computer snapshot -i -d 20  # Slower, more detail
 Target specific apps without switching focus:
 
 ```bash
-agent-computer snapshot -i --app "Finder"
-agent-computer snapshot -i --app "TextEdit"
+agent-desktop snapshot -i --app "Finder"
+agent-desktop snapshot -i --app "TextEdit"
 ```
 
 ### 5. Screenshots as Fallback
@@ -195,9 +195,9 @@ agent-computer snapshot -i --app "TextEdit"
 When the accessibility tree doesn't show what you need:
 
 ```bash
-agent-computer screenshot
+agent-desktop screenshot
 # Visually inspect the screenshot
-agent-computer click 500 300   # Click by coordinates as fallback
+agent-desktop click 500 300   # Click by coordinates as fallback
 ```
 
 ### 6. Compact Mode for Token Savings
@@ -205,7 +205,7 @@ agent-computer click 500 300   # Click by coordinates as fallback
 Use `-c` when you need to minimize token usage:
 
 ```bash
-agent-computer snapshot -i -c   # ~30% fewer tokens
+agent-desktop snapshot -i -c   # ~30% fewer tokens
 ```
 
 ## Troubleshooting
@@ -214,21 +214,21 @@ agent-computer snapshot -i -c   # ~30% fewer tokens
 
 The UI has changed since your last snapshot. Re-snapshot:
 ```bash
-agent-computer snapshot -i
+agent-desktop snapshot -i
 ```
 
 ### Snapshot returns very few elements
 
 - The app may have poor accessibility support
-- Try increasing depth: `agent-computer snapshot -i -d 20`
-- Try without `-i` to see the full tree: `agent-computer snapshot -d 5`
+- Try increasing depth: `agent-desktop snapshot -i -d 20`
+- Try without `-i` to see the full tree: `agent-desktop snapshot -d 5`
 - For Electron apps, use `--with-cdp` for richer access
 - Fall back to screenshots + coordinate clicking
 
 ### Snapshot is slow (>3 seconds)
 
-- Reduce depth: `agent-computer snapshot -i -d 5`
-- Target a specific app: `agent-computer snapshot -i --app "Finder"`
+- Reduce depth: `agent-desktop snapshot -i -d 5`
+- Target a specific app: `agent-desktop snapshot -i --app "Finder"`
 - Complex apps (VS Code, Xcode) with many elements naturally take longer
 
 ### Click hits the wrong element
@@ -239,4 +239,4 @@ agent-computer snapshot -i
 
 ### "Permission denied" errors
 
-Run `agent-computer status` and check for ❌ marks. See [permissions.md](permissions.md) for setup guide.
+Run `agent-desktop status` and check for ❌ marks. See [permissions.md](permissions.md) for setup guide.

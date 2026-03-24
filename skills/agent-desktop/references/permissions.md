@@ -1,6 +1,6 @@
 # Permissions Setup
 
-agent-computer requires two macOS system permissions to function. This guide covers setup, troubleshooting, and terminal-specific instructions.
+agent-desktop requires two macOS system permissions to function. This guide covers setup, troubleshooting, and terminal-specific instructions.
 
 **Related**: [SKILL.md](../SKILL.md) for quick start, [commands.md](commands.md) for `status` command details.
 
@@ -14,7 +14,7 @@ agent-computer requires two macOS system permissions to function. This guide cov
 ## Quick Check
 
 ```bash
-agent-computer status
+agent-desktop status
 # Accessibility: ✅ granted (or ❌ denied)
 # Screen Recording: ✅ granted (or ❌ denied)
 ```
@@ -66,18 +66,18 @@ Each terminal app needs its own grant. The permission is tied to the app that sp
 When running via SSH, tmux, or screen:
 - The **sshd** process or **tmux server** may need the permission instead of (or in addition to) your terminal app
 - For tmux: grant permission to the app that started the tmux server
-- For SSH: grant to `/usr/sbin/sshd` or run `agent-computer` from a local terminal first to establish permissions
+- For SSH: grant to `/usr/sbin/sshd` or run `agent-desktop` from a local terminal first to establish permissions
 
 ### Reset permissions (nuclear option)
 
 If permissions are in a weird state, reset and re-grant:
 
 ```bash
-# Reset Accessibility permissions for agent-computer-daemon
-tccutil reset Accessibility com.agent-computer.daemon
+# Reset Accessibility permissions for agent-desktop-daemon
+tccutil reset Accessibility com.agent-desktop.daemon
 
 # Reset Screen Recording
-tccutil reset ScreenCapture com.agent-computer.daemon
+tccutil reset ScreenCapture com.agent-desktop.daemon
 ```
 
 Then re-add the terminal app in System Settings.

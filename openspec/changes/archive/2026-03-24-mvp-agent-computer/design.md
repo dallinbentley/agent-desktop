@@ -1,6 +1,6 @@
 ## Context
 
-We're building `agent-computer`, a CLI tool for AI agents to control macOS desktops. It's modeled directly on agent-browser (Vercel Labs) which proved that accessibility-tree snapshots with compact @refs are 10-100x more token-efficient than screenshot-based approaches for AI agent interaction.
+We're building `agent-desktop`, a CLI tool for AI agents to control macOS desktops. It's modeled directly on agent-browser (Vercel Labs) which proved that accessibility-tree snapshots with compact @refs are 10-100x more token-efficient than screenshot-based approaches for AI agent interaction.
 
 Technical spikes (S1-S5) have validated all core assumptions:
 - **AX tree traversal**: 50-422ms across 6 real apps (Finder, TextEdit, Safari, System Settings, IDE, Terminal)

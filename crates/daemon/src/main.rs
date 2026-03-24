@@ -1,6 +1,6 @@
-use agent_computer_shared::protocol::*;
-use agent_computer_shared::types::*;
-use agent_computer_shared::errors;
+use agent_desktop_shared::protocol::*;
+use agent_desktop_shared::types::*;
+use agent_desktop_shared::errors;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -16,9 +16,9 @@ mod detector;
 mod refmap;
 
 // Re-export lib crate modules for use in this binary
-use agent_computer_daemon::ax_engine;
-use agent_computer_daemon::capture;
-use agent_computer_daemon::input;
+use agent_desktop_daemon::ax_engine;
+use agent_desktop_daemon::capture;
+use agent_desktop_daemon::input;
 
 // MARK: - Daemon State
 
@@ -1433,7 +1433,7 @@ async fn handle_client(
 
 #[tokio::main]
 async fn main() {
-    log("agent-computer-daemon starting...");
+    log("agent-desktop-daemon starting...");
     log(&format!("PID: {}", std::process::id()));
 
     let socket_path = daemon_socket_path();

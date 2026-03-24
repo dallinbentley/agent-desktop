@@ -1,6 +1,6 @@
 mod common;
 
-use agent_computer_shared::protocol::Request;
+use agent_desktop_shared::protocol::Request;
 use common::TestDaemon;
 
 #[tokio::test]

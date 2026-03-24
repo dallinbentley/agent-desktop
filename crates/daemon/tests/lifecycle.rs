@@ -1,7 +1,7 @@
 mod common;
 
 use common::TestDaemon;
-use agent_computer_shared::protocol::*;
+use agent_desktop_shared::protocol::*;
 
 /// Helper to build a Request with the given command and args.
 fn make_request(id: &str, command: &str, args: serde_json::Value) -> Request {

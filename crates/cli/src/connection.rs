@@ -1,5 +1,5 @@
-use agent_computer_shared::protocol::{Request, Response};
-use agent_computer_shared::types::daemon_socket_path;
+use agent_desktop_shared::protocol::{Request, Response};
+use agent_desktop_shared::types::daemon_socket_path;
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
@@ -24,7 +24,7 @@ impl std::fmt::Display for ConnectionError {
         match self {
             Self::DaemonNotFound => write!(
                 f,
-                "Could not find agent-computer-daemon binary. Make sure it's in the same directory as agent-computer or on your PATH."
+                "Could not find agent-desktop-daemon binary. Make sure it's in the same directory as agent-desktop or on your PATH."
             ),
             Self::DaemonStartTimeout => write!(
                 f,
@@ -107,7 +107,7 @@ fn connect_or_start_daemon(
     }
 
     // Socket not available — start daemon with ready-pipe
-    eprintln!("Starting agent-computer daemon...");
+    eprintln!("Starting agent-desktop daemon...");
     let read_fd = spawn_daemon(verbose)?;
 
     // If we got a ready-pipe read fd, block on it for instant wake
@@ -193,16 +193,16 @@ fn spawn_daemon(verbose: bool) -> Result<Option<i32>, ConnectionError> {
     let daemon_path = cli_path
         .as_ref()
         .and_then(|p| p.parent())
-        .map(|dir| dir.join("agent-computer-daemon"));
+        .map(|dir| dir.join("agent-desktop-daemon"));
 
     let final_path = if let Some(ref path) = daemon_path {
         if path.is_file() {
             path.clone()
         } else {
-            find_in_path("agent-computer-daemon")?
+            find_in_path("agent-desktop-daemon")?
         }
     } else {
-        find_in_path("agent-computer-daemon")?
+        find_in_path("agent-desktop-daemon")?
     };
 
     if verbose {
@@ -210,10 +210,10 @@ fn spawn_daemon(verbose: bool) -> Result<Option<i32>, ConnectionError> {
     }
 
     // Ensure socket directory exists
-    let socket_path = agent_computer_shared::types::daemon_socket_path();
+    let socket_path = agent_desktop_shared::types::daemon_socket_path();
     let socket_dir = socket_path.parent()
         .map(|p| p.to_path_buf())
-        .unwrap_or_else(agent_computer_shared::types::daemon_socket_dir);
+        .unwrap_or_else(agent_desktop_shared::types::daemon_socket_dir);
     let _ = std::fs::create_dir_all(&socket_dir);
 
     // Create ready-pipe: pipe_fds[0] = read end, pipe_fds[1] = write end

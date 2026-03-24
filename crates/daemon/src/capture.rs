@@ -346,7 +346,7 @@ fn capture_screenshot_once(full: bool, app: Option<&str>) -> Result<CaptureResul
 /// Save a CGImage as PNG to the temp directory.
 fn save_image_as_png(image: &CGImage) -> Result<String, String> {
     // Create temp directory
-    let temp_dir = std::env::temp_dir().join("agent-computer");
+    let temp_dir = std::env::temp_dir().join("agent-desktop");
     std::fs::create_dir_all(&temp_dir)
         .map_err(|e| format!("Failed to create temp dir: {e}"))?;
 

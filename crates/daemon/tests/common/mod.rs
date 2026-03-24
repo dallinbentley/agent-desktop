@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
-use agent_computer_shared::protocol::{Request, Response};
+use agent_desktop_shared::protocol::{Request, Response};
 
 /// A test daemon instance running on a unique socket path.
 ///
@@ -19,7 +19,7 @@ impl TestDaemon {
     /// Panics if the daemon fails to start or the socket doesn't appear in time.
     pub async fn start() -> Self {
         let socket_path = PathBuf::from(format!(
-            "/tmp/agent-computer-test-{}.sock",
+            "/tmp/agent-desktop-test-{}.sock",
             uuid::Uuid::new_v4()
         ));
 
@@ -133,15 +133,15 @@ impl TestDaemon {
     }
 
     /// Resolve the daemon binary path.
-    /// Uses CARGO_BIN_EXE_agent-computer-daemon if available (set by cargo test),
+    /// Uses CARGO_BIN_EXE_agent-desktop-daemon if available (set by cargo test),
     /// otherwise searches CARGO_TARGET_DIR, the shared cargo target, and workspace target/debug.
     fn daemon_binary_path() -> PathBuf {
-        // CARGO_BIN_EXE_agent-computer-daemon is set by cargo when running integration tests
-        if let Ok(path) = std::env::var("CARGO_BIN_EXE_agent-computer-daemon") {
+        // CARGO_BIN_EXE_agent-desktop-daemon is set by cargo when running integration tests
+        if let Ok(path) = std::env::var("CARGO_BIN_EXE_agent-desktop-daemon") {
             return PathBuf::from(path);
         }
 
-        let binary_name = "agent-computer-daemon";
+        let binary_name = "agent-desktop-daemon";
 
         // Check CARGO_TARGET_DIR env var
         if let Ok(target_dir) = std::env::var("CARGO_TARGET_DIR") {
@@ -179,7 +179,7 @@ impl TestDaemon {
         }
 
         panic!(
-            "Could not find {} binary. Run `cargo build -p agent-computer-daemon` first.",
+            "Could not find {} binary. Run `cargo build -p agent-desktop-daemon` first.",
             binary_name
         );
     }

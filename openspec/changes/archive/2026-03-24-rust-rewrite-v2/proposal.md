@@ -43,5 +43,5 @@ _None — this is a rewrite, not modifying existing specs._
 - **New Cargo workspace** replacing Package.swift
 - **New dependencies**: `clap` (CLI), `serde`/`serde_json` (JSON), `tokio` (async runtime), `tungstenite` (WebSocket for CDP), `accessibility-sys` (AXUIElement), `core-graphics` (CGEvent), `screencapturekit-rs` (screenshots)
 - **Platform**: macOS 14+ (same as before), with Rust enabling future Linux/Windows
-- **Distribution**: Single static binary via `cargo build --release`, eventual `brew install agent-computer`
+- **Distribution**: Single static binary via `cargo build --release`, eventual `brew install agent-desktop`
 - **Spike code preserved** in Sources/Spikes/ for reference during port

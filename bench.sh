@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bench.sh — Benchmark suite for agent-computer
+# bench.sh — Benchmark suite for agent-desktop
 # Measures cold start, status, get apps, press, click, fill, snapshot
 # Runs N iterations of each warm command, reports avg/min/max
 #
@@ -8,7 +8,7 @@
 set -euo pipefail
 
 ITERATIONS="${1:-5}"
-BINARY="${CARGO_TARGET_DIR:-./target}/release/agent-computer"
+BINARY="${CARGO_TARGET_DIR:-./target}/release/agent-desktop"
 
 # Colors
 RED='\033[0;31m'
@@ -18,7 +18,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 echo "=================================================="
-echo " agent-computer benchmark suite"
+echo " agent-desktop benchmark suite"
 echo " Iterations per command: $ITERATIONS"
 echo " Binary: $BINARY"
 echo "=================================================="
@@ -104,13 +104,13 @@ bench_command() {
 echo -e "${YELLOW}=== Cold Start ===${NC}"
 
 # Kill daemon
-pkill -f agent-computer-daemon 2>/dev/null || true
+pkill -f agent-desktop-daemon 2>/dev/null || true
 sleep 0.5
 
 tmpfile_cold=$(mktemp)
 for i in $(seq 1 "$ITERATIONS"); do
     # Kill daemon before each cold start measurement
-    pkill -f agent-computer-daemon 2>/dev/null || true
+    pkill -f agent-desktop-daemon 2>/dev/null || true
     sleep 0.5
 
     ms=$(time_cmd "$BINARY status" 2>/dev/null) || {

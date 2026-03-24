@@ -1,19 +1,19 @@
 ## 1. Project Skeleton & Shared Types
 
-- [x] 1.1 Set up Package.swift with three targets: `agent-computer` (CLI executable), `agent-computer-daemon` (daemon executable), `AgentComputerShared` (library). Add swift-argument-parser dependency. Scaffold Sources/CLI, Sources/Daemon, Sources/Shared directories. Verify `swift build` succeeds.
+- [x] 1.1 Set up Package.swift with three targets: `agent-desktop` (CLI executable), `agent-desktop-daemon` (daemon executable), `AgentComputerShared` (library). Add swift-argument-parser dependency. Scaffold Sources/CLI, Sources/Daemon, Sources/Shared directories. Verify `swift build` succeeds.
 - [x] 1.2 Define shared protocol types in Sources/Shared: `Command` enum (snapshot, click, fill, type, press, scroll, screenshot, open, get, status), `Response` struct (id, success, data, error, timing), `ElementRef` struct (id, role, label, frame, axPath, actions), `ErrorInfo` struct (code, message, suggestion). All Codable. Unit test for JSON round-trip.
 - [x] 1.3 Define `SnapshotOptions`, `ClickTarget`, `TypeTarget`, `FillTarget`, `PressTarget`, `ScrollTarget`, `ScreenshotOptions`, `OpenTarget`, `GetTarget` arg types in Sources/Shared. All Codable.
 
 ## 2. Daemon Socket Server
 
-- [x] 2.1 Create daemon entry point in Sources/Daemon/main.swift. Create Unix domain socket at `~/.agent-computer/daemon.sock`. Listen for connections. Read newline-delimited JSON, decode as Command, dispatch to handler stubs that return mock responses. Handle SIGTERM/SIGINT for clean shutdown (remove socket file, exit 0).
+- [x] 2.1 Create daemon entry point in Sources/Daemon/main.swift. Create Unix domain socket at `~/.agent-desktop/daemon.sock`. Listen for connections. Read newline-delimited JSON, decode as Command, dispatch to handler stubs that return mock responses. Handle SIGTERM/SIGINT for clean shutdown (remove socket file, exit 0).
 - [x] 2.2 Add request/response correlation: each request has `id`, response echoes it. Add `timing` field measuring elapsed_ms per command. Handle malformed JSON gracefully with INVALID_COMMAND error response.
 - [x] 2.3 Handle stale socket: on startup, if socket file exists, try connecting to it — if connection fails, remove stale file and proceed with creating new socket.
 
 ## 3. CLI Client & Argument Parsing
 
 - [x] 3.1 Create CLI entry point in Sources/CLI/main.swift using Swift Argument Parser. Define subcommands: Snapshot, Click, Fill, Type, Press, Scroll, Screenshot, Open, Get, Status. Parse @ref syntax (strip `@` prefix, validate `e\d+` format). Parse key names and modifier combos for Press (cmd+c → key "c" with modifier .command).
-- [x] 3.2 Implement CLI socket client: connect to `~/.agent-computer/daemon.sock`, send JSON command, read JSON response. If socket doesn't exist or connection fails, spawn daemon as background process via `Process()`, poll for socket (100ms intervals, 5s timeout), then connect.
+- [x] 3.2 Implement CLI socket client: connect to `~/.agent-desktop/daemon.sock`, send JSON command, read JSON response. If socket doesn't exist or connection fails, spawn daemon as background process via `Process()`, poll for socket (100ms intervals, 5s timeout), then connect.
 - [x] 3.3 Implement output formatting: human-readable colored text by default, raw JSON with `--json` flag. Format snapshot as indented tree, actions as brief confirmations, errors with recovery suggestions. Non-zero exit code on failure.
 
 ## 4. Accessibility Tree Snapshot
@@ -53,6 +53,6 @@
 
 ## 9. End-to-End Integration Test
 
-- [x] 9.1 Create a test script that exercises the full demo flow: `open "TextEdit"` → `snapshot -i` → verify output has @refs → `click @e<text_area>` → `type @e<ref> "Hello from agent-computer!"` → `press cmd+a` → `screenshot` → verify PNG exists → `status` → verify all green. Script should run unattended and report pass/fail.
+- [x] 9.1 Create a test script that exercises the full demo flow: `open "TextEdit"` → `snapshot -i` → verify output has @refs → `click @e<text_area>` → `type @e<ref> "Hello from agent-desktop!"` → `press cmd+a` → `screenshot` → verify PNG exists → `status` → verify all green. Script should run unattended and report pass/fail.
 - [x] 9.2 Test against Finder: open → snapshot → click a folder → snapshot again to verify UI changed.
-- [x] 9.3 Build release binary, test `agent-computer --help`, verify daemon auto-start, verify clean shutdown.
+- [x] 9.3 Build release binary, test `agent-desktop --help`, verify daemon auto-start, verify clean shutdown.

@@ -4,7 +4,7 @@ AI agents need a way to observe and interact with macOS desktop applications eff
 
 ## What Changes
 
-- New Swift CLI tool `agent-computer` that AI agents invoke to control macOS
+- New Swift CLI tool `agent-desktop` that AI agents invoke to control macOS
 - Persistent background daemon that maintains state (ref maps, element cache) between CLI calls
 - Accessibility tree snapshot system that produces compact text with `@e1, @e2` refs (~200-400 tokens)
 - Input simulation via CGEvent for mouse clicks, keyboard typing, and key presses
@@ -29,7 +29,7 @@ _None — this is a greenfield project._
 
 ## Impact
 
-- **New binary targets**: `agent-computer` (CLI) and `agent-computer-daemon` (background process)
+- **New binary targets**: `agent-desktop` (CLI) and `agent-desktop-daemon` (background process)
 - **Dependencies**: Swift Argument Parser (CLI parsing), Foundation (IPC/JSON), ApplicationServices (AXUIElement, CGEvent), ScreenCaptureKit, AppKit (NSWorkspace)
 - **System permissions**: Requires Accessibility + Screen Recording permissions granted to the terminal app
 - **Platform**: macOS 14+ (Sonoma) due to SCScreenshotManager requirement

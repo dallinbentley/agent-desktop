@@ -8,7 +8,7 @@ The CLI process creates an OS pipe before spawning the daemon. The write end is 
 - **THEN** the CLI blocks on the pipe read (not polling) and connects to the socket within 5ms of the daemon binding it
 
 #### Scenario: Pipe fd not available (manual daemon start)
-- **WHEN** the daemon is started manually without a pipe fd (e.g., `agent-computer-daemon` directly)
+- **WHEN** the daemon is started manually without a pipe fd (e.g., `agent-desktop-daemon` directly)
 - **THEN** the daemon skips the pipe write and starts normally; the CLI falls back to socket polling at 10ms intervals
 
 #### Scenario: Daemon fails to start

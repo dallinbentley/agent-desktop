@@ -1,7 +1,7 @@
 mod common;
 
 use common::TestDaemon;
-use agent_computer_shared::protocol::*;
+use agent_desktop_shared::protocol::*;
 use std::sync::Once;
 
 /// Helper to build a Request.

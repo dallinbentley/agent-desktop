@@ -30,16 +30,16 @@ Key Rust crates validated: `accessibility-sys` (AXUIElement), `core-graphics` (C
 ### D1: Cargo workspace with 3 crates
 
 ```
-agent-computer/
+agent-desktop/
 ├── Cargo.toml              (workspace)
 ├── crates/
-│   ├── shared/             (agent-computer-shared)
+│   ├── shared/             (agent-desktop-shared)
 │   │   ├── src/
 │   │   │   ├── protocol.rs  # Request, Response, CommandArgs, ResponseData
 │   │   │   ├── types.rs     # ElementRef, RefMap types, error codes, key mappings
 │   │   │   └── errors.rs    # AI-friendly error builders
 │   │   └── Cargo.toml
-│   ├── daemon/             (agent-computer-daemon)
+│   ├── daemon/             (agent-desktop-daemon)
 │   │   ├── src/
 │   │   │   ├── main.rs      # Socket server, command dispatch
 │   │   │   ├── ax_engine.rs # AXUIElement traversal, AX actions
@@ -51,7 +51,7 @@ agent-computer/
 │   │   │   ├── app.rs       # App management (open, focus, list)
 │   │   │   └── snapshot.rs  # Snapshot text formatting + merging
 │   │   └── Cargo.toml
-│   └── cli/                (agent-computer CLI)
+│   └── cli/                (agent-desktop CLI)
 │       ├── src/
 │       │   ├── main.rs      # Clap command definitions
 │       │   ├── connection.rs # Unix socket client + daemon auto-start
@@ -206,19 +206,19 @@ Agent uses: `screen_x = window_origin_x + image_x` (at 1x capture, no scaling ne
 ### D8: Electron/browser CDP setup UX
 
 ```
-$ agent-computer snapshot --app Spotify
+$ agent-desktop snapshot --app Spotify
 ⚠ Spotify is an Electron app but CDP is not available.
   To enable rich UI interaction, relaunch with:
-    agent-computer open --with-cdp Spotify
+    agent-desktop open --with-cdp Spotify
   
   Falling back to screenshot mode.
   [screenshot saved to /tmp/...]
 
-$ agent-computer open --with-cdp Spotify
+$ agent-desktop open --with-cdp Spotify
 Relaunching Spotify with CDP on port 9230...
 Spotify ready with CDP.
 
-$ agent-computer snapshot --app Spotify
+$ agent-desktop snapshot --app Spotify
 [Spotify — Search]
   @e1 button "Home"
   @e2 combobox "What do you want to play?"
@@ -240,4 +240,4 @@ $ agent-computer snapshot --app Spotify
 
 **[CDP port management]** → Multiple Electron apps need different ports. Use deterministic assignment: hash of app name → port in 9222-9399 range. Track active CDP connections in daemon state.
 
-**[Browser must be launched with CDP flag]** → Chrome/Edge need `--remote-debugging-port`. Can auto-detect via DevToolsActivePort file. For users who haven't enabled it, provide `agent-computer open --with-cdp Chrome` helper.
+**[Browser must be launched with CDP flag]** → Chrome/Edge need `--remote-debugging-port`. Can auto-detect via DevToolsActivePort file. For users who haven't enabled it, provide `agent-desktop open --with-cdp Chrome` helper.

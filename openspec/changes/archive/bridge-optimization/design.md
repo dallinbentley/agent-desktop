@@ -20,11 +20,11 @@ The browser bridge shells out to `agent-browser` CLI for every Electron/browser 
 ### D1: Binary bundling strategy
 
 **Approach**: Check for agent-browser in this order:
-1. Bundled binary at `~/.agent-computer/bin/agent-browser` (platform-specific)
+1. Bundled binary at `~/.agent-desktop/bin/agent-browser` (platform-specific)
 2. System PATH (existing `which agent-browser`)
 3. Common npm/nvm paths (existing fallback)
 
-**Auto-download**: If not found anywhere, download the correct platform binary from agent-browser's npm package (it ships pre-compiled Rust binaries for all platforms). Cache at `~/.agent-computer/bin/`.
+**Auto-download**: If not found anywhere, download the correct platform binary from agent-browser's npm package (it ships pre-compiled Rust binaries for all platforms). Cache at `~/.agent-desktop/bin/`.
 
 The npm package structure is:
 ```

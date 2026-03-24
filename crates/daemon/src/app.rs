@@ -1,29 +1,29 @@
-use agent_computer_shared::protocol::*;
-use agent_computer_shared::errors;
+use agent_desktop_shared::protocol::*;
+use agent_desktop_shared::errors;
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::process::Command;
 
-use agent_computer_daemon::ax_engine;
+use agent_desktop_daemon::ax_engine;
 use crate::DaemonState;
 
 // MARK: - App Management
 
 /// Open or focus an application. Uses `open -a` for simplicity and reliability.
 /// If `background` is true, launches hidden without stealing focus.
-pub fn open_app(name: &str) -> Result<(String, i32, bool), agent_computer_shared::types::ErrorInfo> {
+pub fn open_app(name: &str) -> Result<(String, i32, bool), agent_desktop_shared::types::ErrorInfo> {
     open_app_with_options(name, false)
 }
 
 /// Open app in background (hidden, no focus steal).
-pub fn open_app_background(name: &str) -> Result<(String, i32, bool), agent_computer_shared::types::ErrorInfo> {
+pub fn open_app_background(name: &str) -> Result<(String, i32, bool), agent_desktop_shared::types::ErrorInfo> {
     open_app_with_options(name, true)
 }
 
-fn open_app_with_options(name: &str, background: bool) -> Result<(String, i32, bool), agent_computer_shared::types::ErrorInfo> {
+fn open_app_with_options(name: &str, background: bool) -> Result<(String, i32, bool), agent_desktop_shared::types::ErrorInfo> {
     // Check if already running via NSWorkspace native API
-    let was_running = agent_computer_daemon::ns_workspace::is_app_running(name);
+    let was_running = agent_desktop_daemon::ns_workspace::is_app_running(name);
 
     // Use `open -a` to open. Add flags for background mode.
     let mut cmd = Command::new("open");
@@ -58,7 +58,7 @@ fn open_app_with_options(name: &str, background: bool) -> Result<(String, i32, b
 pub async fn open_app_with_cdp(
     name: &str,
     state: &mut DaemonState,
-) -> Result<(String, i32, bool, u16), agent_computer_shared::types::ErrorInfo> {
+) -> Result<(String, i32, bool, u16), agent_desktop_shared::types::ErrorInfo> {
     let port = deterministic_port(name);
 
     // Task 5.1: Check if app is already running and get its PID
@@ -220,7 +220,7 @@ fn probe_cdp_port(port: u16) -> bool {
 /// Falls back to pgrep for apps that may have different process names.
 fn get_app_pid(name: &str) -> Option<i32> {
     // Try NSWorkspace first (fast, no subprocess)
-    if let Some(pid) = agent_computer_daemon::ns_workspace::get_app_pid_by_name(name) {
+    if let Some(pid) = agent_desktop_daemon::ns_workspace::get_app_pid_by_name(name) {
         return Some(pid);
     }
     // Fallback to pgrep for apps whose process name differs from display name
@@ -235,12 +235,12 @@ fn get_app_pid(name: &str) -> Option<i32> {
 
 /// Get list of running GUI app names using NSWorkspace native API.
 fn get_running_app_names() -> Vec<String> {
-    agent_computer_daemon::ns_workspace::get_running_app_names()
+    agent_desktop_daemon::ns_workspace::get_running_app_names()
 }
 
 /// Get running GUI apps as AppInfo structs using NSWorkspace native API.
 fn get_running_gui_apps() -> Vec<AppInfo> {
-    agent_computer_daemon::ns_workspace::get_running_gui_apps()
+    agent_desktop_daemon::ns_workspace::get_running_gui_apps()
 }
 
 /// Get the frontmost window title for an app using AX API.
@@ -328,7 +328,7 @@ pub async fn handle_get(
             match state.ref_map.resolve(ref_id) {
                 Some(elem_ref) => {
                     // Task 8.2: If ref is CDP-sourced, delegate to browser_bridge.get_web()
-                    if elem_ref.source == agent_computer_shared::types::RefSource::CDP {
+                    if elem_ref.source == agent_desktop_shared::types::RefSource::CDP {
                         if let (Some(ref ab_ref), Some(ref session), Some(cdp_port)) =
                             (&elem_ref.ab_ref, &elem_ref.ab_session, elem_ref.cdp_port)
                         {
@@ -453,7 +453,7 @@ pub fn handle_status(
 
     // Use the real AX and capture permission checks
     let ax_trusted = ax_engine::is_process_trusted();
-    let screen_permission = agent_computer_daemon::capture::has_screen_recording_permission();
+    let screen_permission = agent_desktop_daemon::capture::has_screen_recording_permission();
 
     // Use AX engine for frontmost app detection (more reliable)
     let (frontmost_app, frontmost_pid, frontmost_window) = match ax_engine::get_frontmost_app() {
