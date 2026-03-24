@@ -121,7 +121,100 @@ Derived from agent-browser's design strengths:
 - **Fallback:** Use stored frame coordinates for CGEvent targeting
 - **Last resort:** Use stored label for AX search
 
-### 3.4 Performance Strategy
+### 3.4 IPC Protocol Contract (CLI ↔ Daemon)
+
+Communication is over a Unix domain socket at `~/.agent-computer/daemon.sock`. Messages are **newline-delimited JSON** (one JSON object per line).
+
+#### Request Format (CLI → Daemon)
+```json
+{
+  "id": "req_001",
+  "command": "snapshot",
+  "args": {
+    "interactive": true,
+    "compact": false,
+    "depth": 10,
+    "app": null
+  },
+  "options": {
+    "timeout": 5000,
+    "json": false,
+    "verbose": false
+  }
+}
+```
+
+#### Command-specific `args` shapes:
+```
+snapshot:    { interactive: bool, compact: bool, depth: int, app: string?, allWindows: bool }
+click:      { ref: string?, x: int?, y: int?, double: bool, right: bool }
+fill:       { ref: string, text: string }
+type:       { ref: string?, text: string }
+press:      { key: string, modifiers: [string]? }
+scroll:     { direction: "up"|"down"|"left"|"right", amount: int?, ref: string? }
+screenshot: { full: bool, window: bool, app: string? }
+open:       { target: string }
+status:     {}
+get:        { what: "text"|"title"|"apps"|"windows", ref: string?, app: string? }
+```
+
+#### Response Format (Daemon → CLI)
+```json
+{
+  "id": "req_001",
+  "success": true,
+  "data": { ... },
+  "error": null,
+  "timing": { "elapsed_ms": 145 }
+}
+```
+
+#### Success `data` shapes by command:
+```
+snapshot:    { text: string, refCount: int, app: string, window: string }
+click:      { ref: string, coordinates: {x, y}, element: {role, label} }
+fill:       { ref: string, text: string, previousValue: string? }
+type:       { ref: string, text: string }
+press:      { key: string, modifiers: [string] }
+scroll:     { direction: string, amount: int }
+screenshot: { path: string, dimensions: {width, height}, scale: int }
+open:       { app: string, pid: int, wasRunning: bool }
+status:     { daemon: {pid, uptime}, permissions: {accessibility, screenRecording}, frontmost: {app, pid, window}, display: {width, height, scale}, refMap: {count, age_ms} }
+get text:   { ref: string?, text: string }
+get apps:   { apps: [{name, pid, isActive}] }
+get windows:{ windows: [{title, app, pid, frame, isKey}] }
+```
+
+#### Error Response:
+```json
+{
+  "id": "req_001",
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "REF_NOT_FOUND",
+    "message": "Element @e3 not found. The UI may have changed.",
+    "suggestion": "Run `snapshot` to refresh element references."
+  }
+}
+```
+
+#### Error Codes:
+```
+REF_NOT_FOUND       — element ref doesn't exist in current ref map
+REF_STALE           — element existed but can't be re-located in live tree
+NO_REF_MAP          — no snapshot taken yet
+APP_NOT_FOUND       — target app not running / not installed
+WINDOW_NOT_FOUND    — target window doesn't exist
+PERMISSION_DENIED   — missing Accessibility or Screen Recording permission
+TIMEOUT             — command exceeded timeout (partial results may be in data)
+AX_ERROR            — accessibility API returned an error
+INPUT_ERROR         — CGEvent failed to post
+INVALID_COMMAND     — malformed command or args
+DAEMON_ERROR        — internal daemon error
+```
+
+### 3.5 Performance Strategy
 
 Full accessibility tree traversal is known to be slow (1-30s for complex apps). Mitigation:
 
@@ -286,6 +379,398 @@ agent-computer status               ✅ Check daemon health + permissions
 10. AI-friendly error messages
 
 **Deliverable:** Working CLI that an AI agent (via pi's tool system) can use to control simple Mac apps (Finder, TextEdit, System Settings).
+
+### Phase 1 Detailed Breakdown
+
+#### Dependency Graph
+
+```
+                    ┌─────────────────────┐
+                    │  T0: Swift Package   │
+                    │  Setup + Skeleton    │
+                    └──────┬──────────────┘
+                           │
+              ┌────────────┼────────────────┐
+              ▼            ▼                ▼
+    ┌─────────────┐  ┌──────────┐  ┌──────────────────┐
+    │ T1: Shared  │  │ T2: CLI  │  │ T3: Daemon       │
+    │ Protocol &  │  │ Argument │  │ Socket Server     │
+    │ Types       │  │ Parsing  │  │ (listen + accept) │
+    └──────┬──────┘  └────┬─────┘  └────────┬──────────┘
+           │              │                  │
+           │         ┌────┴──────┐           │
+           │         │ T4: CLI   │           │
+           └────────▶│ Socket    │◀──────────┘
+                     │ Client    │
+                     └────┬──────┘
+                          │
+          ┌───────────────┼─ CLI↔Daemon IPC working ──────────┐
+          │               │                                    │
+          ▼               ▼                                    ▼
+  ┌──────────────┐ ┌─────────────┐                  ┌─────────────────┐
+  │ T5: AX Tree  │ │ T8: CGEvent │                  │ T10: Screenshot  │
+  │ Traversal    │ │ Input Sim   │                  │ (ScreenCapture   │
+  │ (raw dump)   │ │ (mouse +    │                  │  Kit)            │
+  └──────┬───────┘ │  keyboard)  │                  └────────┬────────┘
+         │         └──────┬──────┘                           │
+         ▼                │                                  │
+  ┌──────────────┐        │         ┌───────────────┐        │
+  │ T6: Ref Map  │        │         │ T9: Open/Focus│        │
+  │ (assign +    │        ▼         │ App via       │        │
+  │  resolve)    │  ┌──────────┐    │ NSWorkspace   │        │
+  └──────┬───────┘  │ T8b:Click│    └───────────────┘        │
+         │          │ (ref →   │                              │
+         ▼          │ coords → │                              │
+  ┌──────────────┐  │ CGEvent) │                              │
+  │ T7: Snapshot │  └──────────┘                              │
+  │ Formatter    │                                            │
+  │ (text output)│                                            │
+  └──────────────┘                                            │
+         │                                                    │
+         └──────────────── all merge ─────────────────────────┘
+                              │
+                              ▼
+                     ┌────────────────┐
+                     │ T11: Error     │
+                     │ Handling &     │
+                     │ AI-Friendly    │
+                     │ Messages       │
+                     └────────┬───────┘
+                              │
+                              ▼
+                     ┌────────────────┐
+                     │ T12: Status    │
+                     │ Command +      │
+                     │ Permission     │
+                     │ Checks         │
+                     └────────┬───────┘
+                              │
+                              ▼
+                     ┌────────────────┐
+                     │ T13: E2E       │
+                     │ Integration    │
+                     │ Tests          │
+                     └────────────────┘
+```
+
+#### Parallelization Guide
+
+**Can be built concurrently (no dependencies between them):**
+- T1 (Protocol/Types) + T2 (CLI Parsing) + T3 (Daemon Server) — all three can start once T0 is done
+- T5 (AX Tree Traversal) + T8 (CGEvent Input) + T10 (Screenshot) — all three are independent native API integrations, can start once IPC works
+- T9 (Open/Focus App) — independent of all other action commands
+
+**Must be sequential:**
+- T0 → T1/T2/T3 (need project skeleton first)
+- T1 + T2 + T3 → T4 (CLI client needs protocol types, CLI args, and daemon server)
+- T4 → T5/T8/T10 (need working IPC before building commands that use it)
+- T5 → T6 → T7 (tree traversal → ref assignment → text formatting — each builds on prior)
+- T6 + T8 → T8b (click needs both ref resolution AND input simulation)
+- All commands → T11 (error handling wraps everything)
+- T11 → T12 → T13 (status needs errors, E2E tests need everything)
+
+**Optimal 2-developer split:**
+```
+Developer A (daemon/native):     Developer B (CLI/protocol):
+  T0: Package setup (shared)       T0: Package setup (shared)
+  T3: Daemon socket server         T1: Protocol & types
+  T5: AX tree traversal            T2: CLI argument parsing
+  T6: Ref map                      T4: CLI socket client
+  T7: Snapshot formatter           T10: Screenshot capture
+  T8: CGEvent input sim            T9: Open/focus app
+  T8b: Click via ref               T11: Error handling
+                                   T12: Status command
+                     ── merge ──
+                   T13: E2E tests
+```
+
+#### Task Details with Acceptance Criteria
+
+---
+
+**T0: Swift Package Setup + Skeleton**
+- Create `Package.swift` with targets: `agent-computer` (CLI executable), `agent-computer-daemon` (daemon executable), `AgentComputerShared` (library)
+- Add `swift-argument-parser` dependency
+- Scaffold directory structure matching Section 5
+- Both `swift build` and `swift run agent-computer --help` work
+- **AC:** `swift build` succeeds, produces two binaries, `--help` prints usage
+
+---
+
+**T1: Shared Protocol & Types**
+- Define `Command` enum (Codable) with all Phase 1 variants:
+  ```swift
+  enum Command: Codable {
+      case snapshot(SnapshotOptions)
+      case click(ClickTarget)
+      case type(TypeTarget)
+      case press(PressTarget)
+      case screenshot(ScreenshotOptions)
+      case open(OpenTarget)
+      case status
+  }
+  ```
+- Define `Response` type:
+  ```swift
+  struct Response: Codable {
+      let success: Bool
+      let data: ResponseData?  // command-specific payload
+      let error: ErrorInfo?    // AI-friendly error
+  }
+  ```
+- Define `ElementRef` type:
+  ```swift
+  struct ElementRef: Codable {
+      let id: String           // "e1", "e2", ...
+      let role: String         // "AXButton", "AXTextField", ...
+      let label: String?       // human-readable label
+      let frame: CGRect        // screen coordinates
+      let axPath: [PathSegment] // role + index chain for re-traversal
+      let actions: [String]    // available AX actions
+  }
+  ```
+- Define `RefMap` as `[String: ElementRef]`
+- **AC:** All types compile, round-trip through `JSONEncoder`/`JSONDecoder` correctly, unit test for serialization
+
+---
+
+**T2: CLI Argument Parsing**
+- Use Swift Argument Parser to define commands matching Section 4 grammar (Phase 1 subset)
+- Parse `@ref` syntax — strip `@` prefix, validate format `e\d+`
+- Parse key names for `press` — map human names (Enter, Tab, Escape, Space, cmd+c) to internal representation
+- `--json` global flag
+- `--timeout` global flag (default 5000ms)
+- `--verbose` global flag
+- **AC:** `agent-computer snapshot -i` parses correctly, `agent-computer click @e3` extracts ref "e3", `agent-computer press cmd+shift+s` parses modifier combo, invalid commands print helpful usage
+
+---
+
+**T3: Daemon Socket Server**
+- Create Unix domain socket at `~/.agent-computer/daemon.sock`
+- Listen for connections, read newline-delimited JSON commands
+- Dispatch to handler (stub handlers that return mock responses initially)
+- Handle concurrent connections (one at a time is fine for MVP — serial queue)
+- Auto-cleanup stale socket files on startup
+- Graceful shutdown on SIGTERM/SIGINT
+- Daemon auto-starts via `launchd` plist OR CLI spawns it on first use (prefer the latter for simplicity, matching agent-browser)
+- **AC:** Daemon starts, accepts connection, receives JSON command, returns JSON response, exits cleanly on signal
+
+---
+
+**T4: CLI Socket Client**
+- Connect to `~/.agent-computer/daemon.sock`
+- If daemon not running, spawn it as background process and retry connection (with 3s timeout)
+- Send command as JSON, read response
+- Format response for human output (colored text) or `--json` (raw JSON)
+- Handle connection errors with helpful messages ("Daemon not running. Starting..." or "Failed to connect to daemon.")
+- **AC:** CLI sends `status` command to daemon, receives response, prints formatted output. Auto-spawns daemon if not running.
+
+---
+
+**T5: AXUIElement Tree Traversal**
+- Given a PID (or frontmost app), traverse the accessibility tree recursively
+- Extract per-element: role, title, description, value, frame (position + size), children, available actions
+- Use `AXUIElementCopyMultipleAttributeValues` for batch fetching (fetch role + title + frame + children in one call)
+- Respect depth limit (default 10, configurable)
+- Hard timeout (3s) — return partial results if exceeded
+- Filter function: `isInteractive(role:) -> Bool` matching the Interactive Roles list in Section 3.3
+- Return structured tree: `[AXNode]` where `AXNode` has `role, label, frame, children, isInteractive`
+- **AC:** Given TextEdit PID, returns tree with buttons, text areas, menus identified. Completes in < 2s for TextEdit. Respects depth limit. Returns partial results on timeout.
+
+---
+
+**T6: Ref Map Management**
+- After tree traversal, walk the filtered tree and assign sequential refs (`e1`, `e2`, ...)
+- Only interactive elements get refs
+- Store ref map in daemon memory: `[String: ElementRef]`
+- Provide `resolve(ref:) -> ElementRef?` to look up by ref ID
+- Provide `resolveToCoordinates(ref:) -> CGPoint?` — returns center of element's frame
+- Re-traversal support: given an `ElementRef.axPath`, walk the live tree to re-find the element (it may have moved)
+- Invalidate entire ref map when new `snapshot` is requested
+- **AC:** Snapshot of Finder produces ref map with e1...eN. `resolve("e3")` returns correct element. After re-snapshot, old refs are invalid. `resolveToCoordinates("e3")` returns center of the button's frame.
+
+**Ref Map Data Structure:**
+```swift
+class RefMap {
+    private var refs: [String: ElementRef] = [:]
+    private var counter: Int = 0
+    
+    func build(from tree: [AXNode]) -> [String: ElementRef]
+    func resolve(_ refId: String) -> ElementRef?
+    func resolveToCoordinates(_ refId: String) -> CGPoint?
+    func relocate(_ refId: String) -> ElementRef?  // re-traverse to find current position
+    func invalidate()
+}
+```
+
+---
+
+**T7: Snapshot Text Formatter**
+- Take the ref-annotated tree and produce compact text output
+- Format: indented tree with `@ref role "label"` per line
+- Include window title as header: `[AppName — WindowTitle]`
+- Structural context: show parent containers (toolbar, sidebar, content area) as unlabeled indent levels
+- Compact mode (`-c`): collapse single-child containers
+- Output should be < 500 tokens for a typical app window
+- **AC:** Snapshot of TextEdit produces readable text tree, < 500 tokens, all interactive elements have refs, non-interactive structure is minimal but provides spatial context
+
+**Example output format:**
+```
+[TextEdit — Untitled.txt]
+  toolbar:
+    @e1 button "New"
+    @e2 button "Open"
+    @e3 button "Save"
+  content:
+    @e4 text_area "Document content area" (editable, 0 chars)
+  menu_bar:
+    @e5 menu "File"
+    @e6 menu "Edit"
+    @e7 menu "Format"
+```
+
+---
+
+**T8: CGEvent Input Simulation**
+- **Mouse:** `mouseClick(at: CGPoint, button: .left/.right, clickCount: 1/2)`
+  - Create mouseDown event, post, brief delay (10ms), create mouseUp, post
+  - Support left click, right click, double click
+- **Keyboard — press:** `keyPress(key: KeySpec)` where KeySpec maps human names to virtual keycodes
+  - Support: Enter (36), Tab (48), Escape (53), Space (49), Delete (51), arrow keys, etc.
+  - Support modifier combos: `cmd+c` → hold Cmd flag, press 'c', release
+  - Full modifier support: cmd, shift, option/alt, control
+- **Keyboard — type string:** `typeString(_ text: String)`
+  - Convert each character to keyDown+keyUp events
+  - Handle shifted characters (uppercase, symbols) by adding shift flag
+  - Consider using `CGEvent(keyboardEventSource:virtualKey:keyDown:)` with `kCGEventKeyboardSetUnicodeString` for non-ASCII
+- **AC:** `mouseClick(at: CGPoint(x: 100, y: 200))` clicks at those coordinates. `keyPress(.enter)` sends Enter. `keyPress(.combo([.cmd], .c))` sends Cmd+C. `typeString("Hello World!")` types the string including the shifted `!`.
+
+---
+
+**T8b: Click Command (ref → coordinates → CGEvent)**
+- Receive `click @e3` command in daemon
+- Resolve `e3` via RefMap → get `ElementRef`
+- Try primary: re-traverse AX path to verify element still exists, get current frame
+- If stale: try coordinate fallback using stored frame
+- Compute click point: center of frame
+- Call CGEvent mouseClick at computed point
+- Return success with element info, or error with "Element @e3 not found. Run `snapshot` to refresh."
+- **AC:** After snapshot, `click @e3` clicks the correct button. If UI has changed, returns actionable error.
+
+---
+
+**T9: Open/Focus App via NSWorkspace**
+- `open "Safari"` → find running app by name, activate it. If not running, launch it.
+- Use `NSWorkspace.shared.runningApplications` to find by `localizedName`
+- Use `NSWorkspace.shared.open(URL)` or `NSRunningApplication.activate()` to bring to front
+- Handle app not found: "Application 'Safarri' not found. Did you mean 'Safari'?" (fuzzy match)
+- `open "/path/to/file"` → open with default app via `NSWorkspace.shared.open(URL(fileURLWithPath:))`
+- **AC:** `open "TextEdit"` launches or focuses TextEdit. `open "nonexistent"` returns helpful error with suggestions.
+
+---
+
+**T10: Screenshot Capture**
+- Use ScreenCaptureKit (`SCScreenshotManager`) for capture
+- Default: capture frontmost window
+- `--full`: capture entire screen
+- `--app "Finder"`: capture specific app's frontmost window
+- Save to temp file, return file path in response
+- Handle Retina: save at full resolution but report logical dimensions
+- **AC:** `screenshot` saves PNG of frontmost window, returns path. `screenshot --full` captures full screen. File is valid PNG at correct resolution.
+
+---
+
+**T11: Error Handling & AI-Friendly Messages**
+- Wrap all daemon command handlers with error catching
+- Map common errors to actionable messages:
+  | Error | Message |
+  |-------|---------|
+  | Ref not found | "Element @e3 not found. The UI may have changed. Run `snapshot` to refresh element references." |
+  | No permission | "Accessibility permission required. Run `agent-computer setup` to grant access." |
+  | App not found | "Application 'X' not found. Running apps: Safari, Finder, TextEdit. Did you mean 'Y'?" |
+  | Daemon not running | "Starting agent-computer daemon..." (auto-start) |
+  | Timeout | "Snapshot timed out after 3s. Returning partial results (15 of ~40 elements). Try `snapshot -d 5` to reduce depth." |
+  | No refs available | "No element references available. Run `snapshot -i` first to discover interactive elements." |
+- Non-zero exit codes for all failures
+- `--json` mode: `{"success": false, "error": {"code": "REF_NOT_FOUND", "message": "...", "suggestion": "..."}}`
+- **AC:** Every error path returns a message with a concrete next-step suggestion. JSON mode includes machine-parseable error codes.
+
+---
+
+**T12: Status Command + Permission Checks**
+- `agent-computer status` returns:
+  ```
+  agent-computer daemon: running (pid 12345)
+  Accessibility permission: ✅ granted
+  Screen Recording permission: ✅ granted
+  Frontmost app: Finder (pid 456)
+  Active window: ~/Documents — 5 items
+  Display: 2560×1440 @2x (Retina)
+  Ref map: 9 elements (from last snapshot 3s ago)
+  ```
+- Check accessibility permission via `AXIsProcessTrusted()`
+- Check screen recording permission by attempting a test capture
+- **AC:** `status` shows all fields. Missing permissions show ❌ with instructions. Works when daemon is running or not (starts daemon if needed).
+
+---
+
+**T13: E2E Integration Tests**
+- Test script that exercises the full flow:
+  1. `agent-computer open "TextEdit"` → verify TextEdit is frontmost
+  2. `agent-computer snapshot -i` → verify output contains text_area and menu refs
+  3. `agent-computer click @e<text_area_ref>` → verify text area is focused
+  4. `agent-computer type @e<ref> "Hello from agent-computer!"` → verify text appears
+  5. `agent-computer screenshot` → verify PNG file exists
+  6. `agent-computer press cmd+a` → select all
+  7. `agent-computer press cmd+c` → copy
+  8. `agent-computer status` → verify all green
+- Can be run as a Swift test target or shell script
+- **AC:** Full script runs end-to-end without manual intervention. TextEdit ends up with typed text visible.
+
+---
+
+#### Technical Spikes (Investigate Before Estimating)
+
+These are unknowns that should be resolved in the first 2-3 days before committing to estimates:
+
+**Spike S1: AXUIElement Traversal Performance**
+- **Question:** How fast is tree traversal on real apps? (TextEdit, Finder, Safari, VS Code, Slack)
+- **Method:** Write a minimal Swift script that traverses the full tree of each app, measures time and element count
+- **Output:** Table of `app | element_count | traversal_time_ms | interactive_count`
+- **Impacts:** Determines default depth limit, timeout values, whether we need more aggressive caching
+- **Time:** 2-4 hours
+
+**Spike S2: AXorcist as Dependency vs. Roll Our Own**
+- **Question:** Can we use AXorcist as a Swift Package dependency, or should we write our own traversal?
+- **Method:** Try adding AXorcist to Package.swift, call its query/collectAll APIs, evaluate:
+  - Does it build cleanly as a dependency?
+  - Does its output format work for our ref system?
+  - Is the API ergonomic for our snapshot pipeline?
+  - What's the performance overhead vs. raw AXUIElement calls?
+- **Output:** Decision: "use AXorcist", "fork AXorcist", or "roll our own with AXorcist as reference"
+- **Time:** 3-4 hours
+
+**Spike S3: CGEvent Reliability for Typing**
+- **Question:** How reliable is CGEvent keyboard simulation for typing strings? Edge cases with Unicode, special characters, IME?
+- **Method:** Write test script that types various strings into TextEdit via CGEvent and verifies the result
+- **Test strings:** "Hello World", "café", "日本語", "price: $19.99", "path/to/file", "cmd+shift+s triggers", emoji 🎉
+- **Output:** Table of `input | result | match? | notes`
+- **Impacts:** Determines if we need `AXSetValue` as primary method for text fields instead of key events
+- **Time:** 2-3 hours
+
+**Spike S4: ScreenCaptureKit Permission Flow**
+- **Question:** What's the actual UX for granting Screen Recording permission? Can we detect it programmatically? What happens on first run?
+- **Method:** Build minimal ScreenCaptureKit capture, test on a fresh permission state (revoke via `tccutil reset ScreenCapture`)
+- **Output:** Document the permission flow, whether we can detect denied state, and best UX for guiding users
+- **Time:** 1-2 hours
+
+**Spike S5: Daemon Auto-Start Reliability**
+- **Question:** When CLI spawns daemon as a background process, how reliable is it across terminal emulators (Terminal.app, iTerm2, Warp, Alacritty)?
+- **Method:** Test spawning daemon via `Process()` with stdout/stderr redirected to log file, verify it stays alive after CLI exits
+- **Output:** Working daemon spawn code or decision to use launchd plist instead
+- **Time:** 2-3 hours
+
+---
 
 ### Phase 2: Robustness + Full Command Set (Weeks 4-6)
 
