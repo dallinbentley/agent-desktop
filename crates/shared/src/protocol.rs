@@ -49,6 +49,12 @@ pub struct ClickArgs {
     pub double: bool,
     #[serde(default)]
     pub right: bool,
+    /// Bring app to foreground (required for coordinate clicks in --app mode)
+    #[serde(default)]
+    pub foreground: bool,
+    /// Target app name (for headless click routing)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

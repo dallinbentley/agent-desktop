@@ -16,10 +16,11 @@ pub enum InteractionRoute {
         pid: i32,
         element: ElementRef,
     },
-    /// Route to CDP engine (Chrome DevTools Protocol)
-    CDP {
-        port: u16,
-        backend_node_id: i64,
+    /// Route to agent-browser bridge (web/Electron content via CDP)
+    AgentBrowser {
+        session: String,
+        cdp_port: u16,
+        ab_ref: String,
         element: ElementRef,
     },
     /// Route to input engine (coordinate-based)
@@ -116,15 +117,24 @@ impl RefMap {
                 })
             }
             RefSource::CDP => {
+                // CDP-sourced refs are now routed through agent-browser bridge
                 let port = element
                     .cdp_port
                     .ok_or_else(|| format!("CDP ref @{ref_id} has no port"))?;
-                let backend_node_id = element
-                    .cdp_backend_node_id
-                    .ok_or_else(|| format!("CDP ref @{ref_id} has no backend node ID"))?;
-                Ok(InteractionRoute::CDP {
-                    port,
-                    backend_node_id,
+                let ab_ref = element
+                    .ab_ref
+                    .as_ref()
+                    .ok_or_else(|| format!("CDP ref @{ref_id} has no agent-browser ref"))?
+                    .clone();
+                let session = element
+                    .ab_session
+                    .as_ref()
+                    .ok_or_else(|| format!("CDP ref @{ref_id} has no agent-browser session"))?
+                    .clone();
+                Ok(InteractionRoute::AgentBrowser {
+                    session,
+                    cdp_port: port,
+                    ab_ref,
                     element: element.clone(),
                 })
             }
@@ -206,6 +216,8 @@ mod tests {
             cdp_node_id: None,
             cdp_backend_node_id: None,
             cdp_port: None,
+            ab_ref: None,
+            ab_session: None,
         }
     }
 
@@ -222,6 +234,8 @@ mod tests {
             cdp_node_id: Some(42),
             cdp_backend_node_id: Some(100),
             cdp_port: Some(port),
+            ab_ref: Some(format!("e{}", 50)), // original agent-browser ref
+            ab_session: Some("test-app".to_string()),
         }
     }
 
@@ -310,16 +324,18 @@ mod tests {
 
         let route = refmap.route("e1").unwrap();
         match route {
-            InteractionRoute::CDP {
-                port,
-                backend_node_id,
+            InteractionRoute::AgentBrowser {
+                session,
+                cdp_port,
+                ab_ref,
                 element,
             } => {
-                assert_eq!(port, 9222);
-                assert_eq!(backend_node_id, 100);
+                assert_eq!(cdp_port, 9222);
+                assert_eq!(ab_ref, "e50");
+                assert_eq!(session, "test-app");
                 assert_eq!(element.role, "link");
             }
-            _ => panic!("Expected CDP route"),
+            _ => panic!("Expected AgentBrowser route"),
         }
     }
 
@@ -343,6 +359,8 @@ mod tests {
             cdp_node_id: None,
             cdp_backend_node_id: None,
             cdp_port: None,
+            ab_ref: None,
+            ab_session: None,
         });
 
         let route = refmap.route("e1").unwrap();

@@ -614,6 +614,8 @@ pub fn format_snapshot_text(
                 cdp_node_id: None,
                 cdp_backend_node_id: None,
                 cdp_port: None,
+                ab_ref: None,
+                ab_session: None,
             });
         } else if !interactive_only {
             // Show structural parents for context

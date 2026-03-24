@@ -17,10 +17,13 @@ pub struct ElementRef {
     pub ax_path: Option<Vec<PathSegment>>,
     pub ax_actions: Option<Vec<String>>,
     pub ax_pid: Option<i32>,
-    // CDP-specific
+    // CDP-specific (legacy, used by refmap routing)
     pub cdp_node_id: Option<i64>,
     pub cdp_backend_node_id: Option<i64>,
     pub cdp_port: Option<u16>,
+    // agent-browser bridge fields
+    pub ab_ref: Option<String>,       // Original agent-browser ref ID (e.g. "e32")
+    pub ab_session: Option<String>,   // agent-browser session name (e.g. "spotify")
 }
 
 impl ElementRef {

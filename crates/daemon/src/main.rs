@@ -11,7 +11,7 @@ use tokio::signal;
 use tokio::sync::Mutex;
 
 mod app;
-mod cdp_engine;
+mod browser_bridge;
 mod detector;
 mod refmap;
 
@@ -30,14 +30,31 @@ pub struct DaemonState {
     pub cdp_connections: HashMap<String, u16>,
     /// Deterministic port assignments: app_name -> port
     pub port_assignments: HashMap<String, u16>,
+    /// Browser bridge for agent-browser subprocess management
+    pub browser_bridge: browser_bridge::BrowserBridge,
+    /// Track whether the last snapshot was CDP-sourced (for press/scroll delegation)
+    pub last_snapshot_cdp_sourced: bool,
+    /// Session/port of last CDP-sourced snapshot (for press/scroll)
+    pub last_cdp_session: Option<String>,
+    pub last_cdp_port: Option<u16>,
 }
 
 impl DaemonState {
     fn new() -> Self {
+        let bridge = browser_bridge::BrowserBridge::new();
+        if bridge.is_available() {
+            log("agent-browser detected and available");
+        } else {
+            log("WARNING: agent-browser not found. Web/Electron support disabled. Install with: npm install -g agent-browser");
+        }
         Self {
             ref_map: refmap::RefMap::new(),
             cdp_connections: HashMap::new(),
             port_assignments: HashMap::new(),
+            browser_bridge: bridge,
+            last_snapshot_cdp_sourced: false,
+            last_cdp_session: None,
+            last_cdp_port: None,
         }
     }
 
@@ -78,8 +95,8 @@ pub fn handle_command(
         "click" => handle_click(id, args, state, start),
         "fill" => handle_fill(id, args, state, start),
         "type" => handle_type(id, args, state, start),
-        "press" => handle_press(id, args, start),
-        "scroll" => handle_scroll(id, args, start),
+        "press" => handle_press(id, args, state, start),
+        "scroll" => handle_scroll(id, args, state, start),
         "screenshot" => handle_screenshot(id, args, start),
         "open" => {
             let open_args: OpenArgs = match serde_json::from_value(args.clone()) {
@@ -187,6 +204,7 @@ fn handle_snapshot(
             for r in refs {
                 state.ref_map.insert(r);
             }
+            state.last_snapshot_cdp_sourced = false;
 
             Response::ok(
                 id.to_string(),
@@ -200,61 +218,90 @@ fn handle_snapshot(
             )
         }
         detector::SnapshotStrategy::CDPOnly { cdp_port } => {
-            // CDP-only snapshot (Electron/CEF apps)
-            match cdp_engine::connect_to_active_page(cdp_port) {
-                Ok(mut conn) => {
-                    match cdp_engine::get_cdp_snapshot(&mut conn, 1) {
-                        Ok(result) => {
-                            let ref_count = result.refs.len() as i32;
+            // CDP-only snapshot via agent-browser bridge (Electron/CEF apps)
+            if !state.browser_bridge.is_available() {
+                log("agent-browser not available, falling back to AX for CDP-only app");
+                let (tree, ax_name, win_title) = ax_engine::take_snapshot(pid, depth, 3.0);
+                let name = if ax_name != "Unknown" { ax_name } else { app_name };
+                let (text, refs) = ax_engine::format_snapshot_text(&tree, &name, &win_title, snap_args.interactive, pid);
+                let ref_count = refs.len() as i32;
+                state.ref_map.clear();
+                for r in refs { state.ref_map.insert(r); }
+                state.last_snapshot_cdp_sourced = false;
+                return Response::ok(id.to_string(), ResponseData::Snapshot(SnapshotData { text, ref_count, app: name, window: win_title }), elapsed());
+            }
 
-                            // Update ref map
-                            state.ref_map.clear();
-                            for r in result.refs {
-                                state.ref_map.insert(r);
-                            }
+            let session = app_name.to_lowercase().replace(' ', "-");
+            match state.browser_bridge.snapshot(&session, cdp_port, snap_args.interactive) {
+                Ok(parsed_elements) => {
+                    // Build ElementRefs from parsed agent-browser output
+                    let mut refs = Vec::new();
+                    let mut lines = Vec::new();
+                    let mut counter: usize = 1;
 
-                            // Build header
-                            let text = format!("[{app_name}]\n{}", result.text);
+                    for elem in &parsed_elements {
+                        let ref_id = format!("e{counter}");
+                        let line = if let Some(ref lbl) = elem.label {
+                            format!("  @{ref_id} {} \"{}\"", elem.role, lbl)
+                        } else {
+                            format!("  @{ref_id} {}", elem.role)
+                        };
+                        lines.push(line);
 
-                            Response::ok(
-                                id.to_string(),
-                                ResponseData::Snapshot(SnapshotData {
-                                    text,
-                                    ref_count,
-                                    app: app_name,
-                                    window: None,
-                                }),
-                                elapsed(),
-                            )
-                        }
-                        Err(e) => {
-                            // Fall back to AX
-                            log(&format!("CDP snapshot failed, falling back to AX: {}", e));
-                            let (tree, ax_name, win_title) = ax_engine::take_snapshot(pid, depth, 3.0);
-                            let name = if ax_name != "Unknown" { ax_name } else { app_name };
-                            let (text, refs) = ax_engine::format_snapshot_text(&tree, &name, &win_title, snap_args.interactive, pid);
-                            let ref_count = refs.len() as i32;
-                            state.ref_map.clear();
-                            for r in refs { state.ref_map.insert(r); }
-                            Response::ok(id.to_string(), ResponseData::Snapshot(SnapshotData { text, ref_count, app: name, window: win_title }), elapsed())
-                        }
+                        refs.push(ElementRef {
+                            id: ref_id,
+                            source: RefSource::CDP,
+                            role: elem.role.clone(),
+                            label: elem.label.clone(),
+                            frame: None,
+                            ax_path: None,
+                            ax_actions: None,
+                            ax_pid: None,
+                            cdp_node_id: None,
+                            cdp_backend_node_id: None,
+                            cdp_port: Some(cdp_port),
+                            ab_ref: Some(elem.ref_id.clone()),
+                            ab_session: Some(session.clone()),
+                        });
+                        counter += 1;
                     }
+
+                    let ref_count = refs.len() as i32;
+                    let text = format!("[{}]\n{}", app_name, lines.join("\n"));
+
+                    state.ref_map.clear();
+                    for r in refs { state.ref_map.insert(r); }
+                    state.last_snapshot_cdp_sourced = true;
+                    state.last_cdp_session = Some(session);
+                    state.last_cdp_port = Some(cdp_port);
+
+                    Response::ok(
+                        id.to_string(),
+                        ResponseData::Snapshot(SnapshotData {
+                            text,
+                            ref_count,
+                            app: app_name,
+                            window: None,
+                        }),
+                        elapsed(),
+                    )
                 }
                 Err(e) => {
                     // Fall back to AX
-                    log(&format!("CDP connection failed, falling back to AX: {}", e));
+                    log(&format!("agent-browser snapshot failed, falling back to AX: {}", e));
                     let (tree, ax_name, win_title) = ax_engine::take_snapshot(pid, depth, 3.0);
                     let name = if ax_name != "Unknown" { ax_name } else { app_name };
                     let (text, refs) = ax_engine::format_snapshot_text(&tree, &name, &win_title, snap_args.interactive, pid);
                     let ref_count = refs.len() as i32;
                     state.ref_map.clear();
                     for r in refs { state.ref_map.insert(r); }
+                    state.last_snapshot_cdp_sourced = false;
                     Response::ok(id.to_string(), ResponseData::Snapshot(SnapshotData { text, ref_count, app: name, window: win_title }), elapsed())
                 }
             }
         }
         detector::SnapshotStrategy::MergedAXAndCDP { cdp_port } => {
-            // Merged: AX for chrome, CDP for web content
+            // Merged: AX for browser chrome (stop at AXWebArea), agent-browser for web content
             let (tree, ax_name, win_title) = ax_engine::take_snapshot(pid, depth, 3.0);
             let display_name = if ax_name != "Unknown" { ax_name } else { app_name.clone() };
 
@@ -262,37 +309,65 @@ fn handle_snapshot(
                 &tree, &display_name, &win_title, snap_args.interactive, pid,
             );
 
-            // Try to get CDP snapshot for web content
-            let (merged_text, all_refs) = match cdp_engine::connect_to_active_page(cdp_port) {
-                Ok(mut conn) => {
-                    let cdp_start = ax_refs.len() + 1;
-                    match cdp_engine::get_cdp_snapshot(&mut conn, cdp_start) {
-                        Ok(cdp_result) => {
-                            let mut text = ax_text;
-                            if !cdp_result.text.is_empty() {
-                                text.push_str("  --- web content ---\n");
-                                text.push_str(&cdp_result.text);
+            // Try to get web content via agent-browser
+            let session = app_name.to_lowercase().replace(' ', "-");
+            let (merged_text, all_refs, cdp_sourced) = if state.browser_bridge.is_available() {
+                match state.browser_bridge.snapshot(&session, cdp_port, snap_args.interactive) {
+                    Ok(parsed_elements) => {
+                        let mut text = ax_text;
+                        let ax_count = ax_refs.len();
+                        let mut all = ax_refs;
+
+                        if !parsed_elements.is_empty() {
+                            text.push_str("  --- web content ---\n");
+                            let mut counter = ax_count + 1;
+                            for elem in &parsed_elements {
+                                let ref_id = format!("e{counter}");
+                                let line = if let Some(ref lbl) = elem.label {
+                                    format!("  @{ref_id} {} \"{}\"", elem.role, lbl)
+                                } else {
+                                    format!("  @{ref_id} {}", elem.role)
+                                };
+                                text.push_str(&line);
+                                text.push('\n');
+
+                                all.push(ElementRef {
+                                    id: ref_id,
+                                    source: RefSource::CDP,
+                                    role: elem.role.clone(),
+                                    label: elem.label.clone(),
+                                    frame: None,
+                                    ax_path: None,
+                                    ax_actions: None,
+                                    ax_pid: None,
+                                    cdp_node_id: None,
+                                    cdp_backend_node_id: None,
+                                    cdp_port: Some(cdp_port),
+                                    ab_ref: Some(elem.ref_id.clone()),
+                                    ab_session: Some(session.clone()),
+                                });
+                                counter += 1;
                             }
-                            let mut all = ax_refs;
-                            all.extend(cdp_result.refs);
-                            (text, all)
                         }
-                        Err(e) => {
-                            log(&format!("CDP snapshot failed in merged mode: {}", e));
-                            (ax_text, ax_refs)
-                        }
+                        (text, all, true)
+                    }
+                    Err(e) => {
+                        log(&format!("agent-browser snapshot failed in merged mode: {}", e));
+                        (ax_text, ax_refs, false)
                     }
                 }
-                Err(e) => {
-                    log(&format!("CDP connection failed in merged mode: {}", e));
-                    (ax_text, ax_refs)
-                }
+            } else {
+                log("agent-browser not available for merged snapshot, using AX only");
+                (ax_text, ax_refs, false)
             };
 
             let ref_count = all_refs.len() as i32;
             state.ref_map.clear();
-            for r in all_refs {
-                state.ref_map.insert(r);
+            for r in all_refs { state.ref_map.insert(r); }
+            state.last_snapshot_cdp_sourced = cdp_sourced;
+            if cdp_sourced {
+                state.last_cdp_session = Some(session);
+                state.last_cdp_port = Some(cdp_port);
             }
 
             Response::ok(
@@ -348,8 +423,25 @@ fn handle_click(
         input::MouseButton::Left
     };
 
-    // Coordinate-based click
+    // Coordinate-based click — requires --foreground when targeting a background app
     if let (Some(x), Some(y)) = (click_args.x, click_args.y) {
+        if click_args.app.is_some() && !click_args.foreground {
+            return Response::fail(
+                id.to_string(),
+                errors::invalid_command("Coordinate clicks require --foreground flag or the app must be frontmost."),
+                elapsed(),
+            );
+        }
+        // If --foreground specified, bring app to front first
+        if click_args.foreground {
+            if let Some(ref app_name) = click_args.app {
+                let _ = std::process::Command::new("osascript")
+                    .arg("-e")
+                    .arg(format!(r#"tell application "{}" to activate"#, app_name))
+                    .output();
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+        }
         input::mouse_click(x, y, button, click_count);
         return Response::ok(
             id.to_string(),
@@ -406,9 +498,29 @@ fn handle_click(
                 }
             }
 
-            // CGEvent fallback
+            // CGEvent fallback — only if not in headless --app mode
             if !clicked_via_ax {
+                if click_args.app.is_some() && !click_args.foreground {
+                    // In --app mode without --foreground, CGEvent clicks would steal focus
+                    return Response::fail(
+                        id.to_string(),
+                        errors::invalid_command(
+                            "AX headless click failed and CGEvent fallback requires --foreground in --app mode."
+                        ),
+                        elapsed(),
+                    );
+                }
                 if let Some((cx, cy)) = element.center() {
+                    // Bring to front if --foreground was specified
+                    if click_args.foreground {
+                        if let Some(ref app_name) = click_args.app {
+                            let _ = std::process::Command::new("osascript")
+                                .arg("-e")
+                                .arg(format!(r#"tell application "{}" to activate"#, app_name))
+                                .output();
+                            std::thread::sleep(std::time::Duration::from_millis(200));
+                        }
+                    }
                     input::mouse_click(cx, cy, button, click_count);
                 } else {
                     return Response::fail(
@@ -433,21 +545,15 @@ fn handle_click(
                 elapsed(),
             )
         }
-        refmap::InteractionRoute::CDP {
-            port,
-            backend_node_id,
+        refmap::InteractionRoute::AgentBrowser {
+            session,
+            cdp_port,
+            ab_ref,
             element,
         } => {
-            // CDP click
-            match cdp_engine::connect_to_active_page(port) {
-                Ok(mut conn) => {
-                    if let Err(e) = cdp_engine::cdp_click(&mut conn, backend_node_id) {
-                        return Response::fail(
-                            id.to_string(),
-                            errors::cdp_error(&e),
-                            elapsed(),
-                        );
-                    }
+            // Agent-browser click — delegate to bridge
+            match state.browser_bridge.click(&session, cdp_port, &ab_ref) {
+                Ok(_) => {
                     let coords = element.center().map(|(x, y)| Point { x, y }).unwrap_or(Point { x: 0.0, y: 0.0 });
                     Response::ok(
                         id.to_string(),
@@ -578,20 +684,15 @@ fn handle_fill(
                 elapsed(),
             )
         }
-        refmap::InteractionRoute::CDP {
-            port,
-            backend_node_id,
+        refmap::InteractionRoute::AgentBrowser {
+            session,
+            cdp_port,
+            ab_ref,
             ..
         } => {
-            match cdp_engine::connect_to_active_page(port) {
-                Ok(mut conn) => {
-                    if let Err(e) = cdp_engine::cdp_fill(&mut conn, backend_node_id, &fill_args.text) {
-                        return Response::fail(
-                            id.to_string(),
-                            errors::cdp_error(&e),
-                            elapsed(),
-                        );
-                    }
+            // Agent-browser fill — delegate to bridge
+            match state.browser_bridge.fill(&session, cdp_port, &ab_ref, &fill_args.text) {
+                Ok(_) => {
                     Response::ok(
                         id.to_string(),
                         ResponseData::Fill(FillData {
@@ -667,9 +768,15 @@ fn handle_type(
                 }
                 input::type_string(&type_args.text);
             }
-            refmap::InteractionRoute::CDP { port, .. } => {
-                if let Ok(mut conn) = cdp_engine::connect_to_active_page(port) {
-                    let _ = cdp_engine::cdp_type_text(&mut conn, &type_args.text);
+            refmap::InteractionRoute::AgentBrowser {
+                session,
+                cdp_port,
+                ab_ref,
+                ..
+            } => {
+                // Agent-browser type — delegate to bridge
+                if let Err(e) = state.browser_bridge.type_text(&session, cdp_port, &ab_ref, &type_args.text) {
+                    log(&format!("agent-browser type_text failed: {}", e));
                 }
             }
             refmap::InteractionRoute::Coordinate { x, y, .. } => {
@@ -698,6 +805,7 @@ fn handle_type(
 fn handle_press(
     id: &str,
     args: &serde_json::Value,
+    state: &mut DaemonState,
     start: std::time::Instant,
 ) -> Response {
     let elapsed = || start.elapsed().as_secs_f64() * 1000.0;
@@ -712,6 +820,28 @@ fn handle_press(
             );
         }
     };
+
+    // If last snapshot was CDP-sourced, delegate to agent-browser for headless key press
+    if state.last_snapshot_cdp_sourced {
+        if let (Some(ref session), Some(cdp_port)) = (&state.last_cdp_session, state.last_cdp_port) {
+            match state.browser_bridge.press(session, cdp_port, &press_args.key) {
+                Ok(()) => {
+                    return Response::ok(
+                        id.to_string(),
+                        ResponseData::Press(PressData {
+                            key: press_args.key,
+                            modifiers: press_args.modifiers.unwrap_or_default(),
+                        }),
+                        elapsed(),
+                    );
+                }
+                Err(e) => {
+                    log(&format!("agent-browser press failed, falling back to CGEvent: {}", e));
+                    // Fall through to CGEvent below
+                }
+            }
+        }
+    }
 
     let modifiers = press_args.modifiers.as_deref().unwrap_or(&[]);
     let flags = input::parse_modifier_flags(modifiers);
@@ -746,6 +876,7 @@ fn handle_press(
 fn handle_scroll(
     id: &str,
     args: &serde_json::Value,
+    state: &mut DaemonState,
     start: std::time::Instant,
 ) -> Response {
     let elapsed = || start.elapsed().as_secs_f64() * 1000.0;
@@ -762,6 +893,29 @@ fn handle_scroll(
     };
 
     let amount = scroll_args.amount.unwrap_or(3); // Default 3 lines
+
+    // If last snapshot was CDP-sourced, delegate to agent-browser for headless scroll
+    if state.last_snapshot_cdp_sourced {
+        if let (Some(ref session), Some(cdp_port)) = (&state.last_cdp_session, state.last_cdp_port) {
+            match state.browser_bridge.scroll(session, cdp_port, &scroll_args.direction, amount) {
+                Ok(()) => {
+                    return Response::ok(
+                        id.to_string(),
+                        ResponseData::Scroll(ScrollData {
+                            direction: scroll_args.direction,
+                            amount,
+                        }),
+                        elapsed(),
+                    );
+                }
+                Err(e) => {
+                    log(&format!("agent-browser scroll failed, falling back to CGEvent: {}", e));
+                    // Fall through to CGEvent below
+                }
+            }
+        }
+    }
+
     input::scroll(&scroll_args.direction, amount);
 
     Response::ok(
@@ -999,6 +1153,18 @@ async fn main() {
     }
 
     log("Shutting down...");
+
+    // Close all agent-browser sessions (Task 5.3)
+    {
+        let mut state = state.lock().await;
+        let session_count = state.browser_bridge.active_sessions.len();
+        if session_count > 0 {
+            log(&format!("Closing {} agent-browser session(s)...", session_count));
+            state.browser_bridge.close_all();
+            log("All agent-browser sessions closed");
+        }
+    }
+
     let _ = std::fs::remove_file(&socket_path_clone);
     log("Daemon exited cleanly");
 }

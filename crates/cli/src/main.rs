@@ -68,6 +68,14 @@ enum Commands {
         /// Right-click
         #[arg(long)]
         right: bool,
+
+        /// Bring app to foreground (required for coordinate clicks with --app)
+        #[arg(long)]
+        foreground: bool,
+
+        /// Target app name (headless click)
+        #[arg(long)]
+        app: Option<String>,
     },
 
     /// Clear and fill a text field
@@ -218,6 +226,8 @@ fn main() {
             y,
             double,
             right,
+            foreground,
+            app,
         } => {
             if let Some(y_val) = y {
                 // Coordinate pair mode
@@ -229,6 +239,8 @@ fn main() {
                             y: Some(*y_val),
                             double: *double,
                             right: *right,
+                            foreground: *foreground,
+                            app: app.clone(),
                         };
                         ("click", serde_json::to_value(args).unwrap())
                     }
@@ -244,6 +256,8 @@ fn main() {
                     y: None,
                     double: *double,
                     right: *right,
+                    foreground: *foreground,
+                    app: app.clone(),
                 };
                 ("click", serde_json::to_value(args).unwrap())
             } else if ref_or_x.parse::<f64>().is_ok() {

@@ -111,6 +111,20 @@ pub fn open_app_with_cdp(
             state.cdp_connections.insert(name.to_string(), port);
             state.port_assignments.insert(name.to_string(), port);
 
+            // Auto-connect agent-browser session (Task 5.2)
+            if state.browser_bridge.is_available() && cdp_ready {
+                let session = name.to_lowercase().replace(' ', "-");
+                match state.browser_bridge.connect(&session, port) {
+                    Ok(()) => {
+                        eprintln!("[app] agent-browser session '{}' connected on port {}", session, port);
+                    }
+                    Err(e) => {
+                        eprintln!("[app] Warning: agent-browser connect failed for '{}': {}", session, e);
+                        // Non-fatal — agent-browser will auto-connect on first command anyway
+                    }
+                }
+            }
+
             Ok((name.to_string(), pid, false, port))
         }
         Err(e) => Err(errors::daemon_error(&format!(

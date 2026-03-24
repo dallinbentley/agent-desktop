@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 
 use agent_computer_shared::types::{AppKind, KNOWN_BROWSER_BUNDLE_IDS};
 
-use crate::cdp_engine;
 use crate::refmap::InteractionRoute;
 
 // MARK: - 7.1 App Detection
@@ -70,23 +69,41 @@ fn has_cef_framework(bundle_path: &Path) -> bool {
     cef_paths.iter().any(|p| p.exists())
 }
 
+/// Probe a single CDP port by hitting /json/version with 500ms timeout.
+/// Returns true if a CDP endpoint is responding on this port.
+fn probe_cdp_port(port: u16) -> bool {
+    let url = format!("http://localhost:{port}/json/version");
+    ureq::get(&url)
+        .timeout(std::time::Duration::from_millis(500))
+        .call()
+        .is_ok()
+}
+
+/// Scan standard CDP ports 9222-9229 and return the first available.
+fn scan_cdp_ports() -> Option<u16> {
+    for port in 9222..=9229 {
+        if probe_cdp_port(port) {
+            return Some(port);
+        }
+    }
+    None
+}
+
 /// Probe for a CDP port on an app.
 /// If a specific port is given, try that first.
 /// Otherwise scan standard ports 9222-9229.
 fn probe_app_cdp_port(_pid: i32, specific_port: Option<u16>) -> Option<u16> {
     // Try deterministic port first (based on app)
     if let Some(port) = specific_port {
-        let result = cdp_engine::probe_cdp_port(port);
-        if result.available {
+        if probe_cdp_port(port) {
             return Some(port);
         }
     }
 
     // Scan standard range
-    if let Some(result) = cdp_engine::scan_cdp_ports() {
+    if let Some(port) = scan_cdp_ports() {
         // TODO: Verify the CDP port actually belongs to this PID
-        // For now, just return the first available port
-        return Some(result.port);
+        return Some(port);
     }
 
     None
@@ -212,8 +229,12 @@ pub fn snapshot_strategy(app_kind: &AppKind) -> SnapshotStrategy {
 pub enum InteractionEngine {
     /// Use AX engine (native accessibility actions)
     AX,
-    /// Use CDP engine (Chrome DevTools Protocol)
-    CDP { port: u16, backend_node_id: i64 },
+    /// Use agent-browser bridge (headless CDP via agent-browser CLI)
+    AgentBrowser {
+        session: String,
+        cdp_port: u16,
+        ab_ref: String,
+    },
     /// Use input engine (CGEvent-based coordinate input)
     Input { x: f64, y: f64 },
 }
@@ -222,13 +243,15 @@ pub enum InteractionEngine {
 pub fn route_interaction(route: &InteractionRoute) -> InteractionEngine {
     match route {
         InteractionRoute::AX { .. } => InteractionEngine::AX,
-        InteractionRoute::CDP {
-            port,
-            backend_node_id,
+        InteractionRoute::AgentBrowser {
+            session,
+            cdp_port,
+            ab_ref,
             ..
-        } => InteractionEngine::CDP {
-            port: *port,
-            backend_node_id: *backend_node_id,
+        } => InteractionEngine::AgentBrowser {
+            session: session.clone(),
+            cdp_port: *cdp_port,
+            ab_ref: ab_ref.clone(),
         },
         InteractionRoute::Coordinate { x, y, .. } => InteractionEngine::Input { x: *x, y: *y },
     }
@@ -383,6 +406,8 @@ mod tests {
                 cdp_node_id: None,
                 cdp_backend_node_id: None,
                 cdp_port: None,
+                ab_ref: None,
+                ab_session: None,
             },
         };
         match route_interaction(&ax_route) {
@@ -390,9 +415,10 @@ mod tests {
             _ => panic!("Expected AX engine"),
         }
 
-        let cdp_route = InteractionRoute::CDP {
-            port: 9222,
-            backend_node_id: 42,
+        let ab_route = InteractionRoute::AgentBrowser {
+            session: "spotify".to_string(),
+            cdp_port: 9222,
+            ab_ref: "e32".to_string(),
             element: ElementRef {
                 id: "e2".to_string(),
                 source: RefSource::CDP,
@@ -405,17 +431,21 @@ mod tests {
                 cdp_node_id: Some(10),
                 cdp_backend_node_id: Some(42),
                 cdp_port: Some(9222),
+                ab_ref: Some("e32".to_string()),
+                ab_session: Some("spotify".to_string()),
             },
         };
-        match route_interaction(&cdp_route) {
-            InteractionEngine::CDP {
-                port,
-                backend_node_id,
+        match route_interaction(&ab_route) {
+            InteractionEngine::AgentBrowser {
+                session,
+                cdp_port,
+                ab_ref,
             } => {
-                assert_eq!(port, 9222);
-                assert_eq!(backend_node_id, 42);
+                assert_eq!(cdp_port, 9222);
+                assert_eq!(ab_ref, "e32");
+                assert_eq!(session, "spotify");
             }
-            _ => panic!("Expected CDP engine"),
+            _ => panic!("Expected AgentBrowser engine"),
         }
     }
 }
