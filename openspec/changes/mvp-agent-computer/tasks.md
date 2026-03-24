@@ -1,8 +1,8 @@
 ## 1. Project Skeleton & Shared Types
 
-- [ ] 1.1 Set up Package.swift with three targets: `agent-computer` (CLI executable), `agent-computer-daemon` (daemon executable), `AgentComputerShared` (library). Add swift-argument-parser dependency. Scaffold Sources/CLI, Sources/Daemon, Sources/Shared directories. Verify `swift build` succeeds.
-- [ ] 1.2 Define shared protocol types in Sources/Shared: `Command` enum (snapshot, click, fill, type, press, scroll, screenshot, open, get, status), `Response` struct (id, success, data, error, timing), `ElementRef` struct (id, role, label, frame, axPath, actions), `ErrorInfo` struct (code, message, suggestion). All Codable. Unit test for JSON round-trip.
-- [ ] 1.3 Define `SnapshotOptions`, `ClickTarget`, `TypeTarget`, `FillTarget`, `PressTarget`, `ScrollTarget`, `ScreenshotOptions`, `OpenTarget`, `GetTarget` arg types in Sources/Shared. All Codable.
+- [x] 1.1 Set up Package.swift with three targets: `agent-computer` (CLI executable), `agent-computer-daemon` (daemon executable), `AgentComputerShared` (library). Add swift-argument-parser dependency. Scaffold Sources/CLI, Sources/Daemon, Sources/Shared directories. Verify `swift build` succeeds.
+- [x] 1.2 Define shared protocol types in Sources/Shared: `Command` enum (snapshot, click, fill, type, press, scroll, screenshot, open, get, status), `Response` struct (id, success, data, error, timing), `ElementRef` struct (id, role, label, frame, axPath, actions), `ErrorInfo` struct (code, message, suggestion). All Codable. Unit test for JSON round-trip.
+- [x] 1.3 Define `SnapshotOptions`, `ClickTarget`, `TypeTarget`, `FillTarget`, `PressTarget`, `ScrollTarget`, `ScreenshotOptions`, `OpenTarget`, `GetTarget` arg types in Sources/Shared. All Codable.
 
 ## 2. Daemon Socket Server
 
