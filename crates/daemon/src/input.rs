@@ -195,3 +195,57 @@ pub enum MouseButton {
     Left,
     Right,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_modifier_flags_empty() {
+        let flags = parse_modifier_flags(&[]);
+        assert_eq!(flags, CGEventFlags::CGEventFlagNull);
+    }
+
+    #[test]
+    fn test_parse_modifier_flags_command() {
+        let flags = parse_modifier_flags(&["cmd".to_string()]);
+        assert!(flags.contains(CGEventFlags::CGEventFlagCommand));
+    }
+
+    #[test]
+    fn test_parse_modifier_flags_multiple() {
+        let flags = parse_modifier_flags(&[
+            "cmd".to_string(),
+            "shift".to_string(),
+            "alt".to_string(),
+        ]);
+        assert!(flags.contains(CGEventFlags::CGEventFlagCommand));
+        assert!(flags.contains(CGEventFlags::CGEventFlagShift));
+        assert!(flags.contains(CGEventFlags::CGEventFlagAlternate));
+    }
+
+    #[test]
+    fn test_parse_modifier_flags_aliases() {
+        let flags1 = parse_modifier_flags(&["command".to_string()]);
+        let flags2 = parse_modifier_flags(&["meta".to_string()]);
+        let flags3 = parse_modifier_flags(&["cmd".to_string()]);
+        assert_eq!(flags1, flags2);
+        assert_eq!(flags2, flags3);
+
+        let flags4 = parse_modifier_flags(&["option".to_string()]);
+        let flags5 = parse_modifier_flags(&["opt".to_string()]);
+        let flags6 = parse_modifier_flags(&["alt".to_string()]);
+        assert_eq!(flags4, flags5);
+        assert_eq!(flags5, flags6);
+
+        let flags7 = parse_modifier_flags(&["control".to_string()]);
+        let flags8 = parse_modifier_flags(&["ctrl".to_string()]);
+        assert_eq!(flags7, flags8);
+    }
+
+    #[test]
+    fn test_parse_modifier_flags_unknown() {
+        let flags = parse_modifier_flags(&["unknown".to_string()]);
+        assert_eq!(flags, CGEventFlags::CGEventFlagNull);
+    }
+}

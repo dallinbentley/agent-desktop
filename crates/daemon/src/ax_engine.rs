@@ -834,18 +834,17 @@ fn get_frontmost_via_ax() -> Option<(String, i32)> {
 
 /// Tier 2: Use NSWorkspace.frontmostApplication via objc2-app-kit.
 fn get_frontmost_via_nsworkspace() -> Option<(String, i32)> {
-    use objc2_app_kit::{NSRunningApplication, NSWorkspace};
+    use objc2_app_kit::NSWorkspace;
 
-    let workspace = unsafe { NSWorkspace::sharedWorkspace() };
-    let app = unsafe { workspace.frontmostApplication() };
+    let workspace = NSWorkspace::sharedWorkspace();
+    let app = workspace.frontmostApplication();
     let app = app?;
 
-    let pid = unsafe { app.processIdentifier() };
-    let name = unsafe {
-        app.localizedName()
-            .map(|n| n.to_string())
-            .unwrap_or_else(|| "Unknown".to_string())
-    };
+    let pid = app.processIdentifier();
+    let name = app
+        .localizedName()
+        .map(|n| n.to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
 
     Some((name, pid))
 }
@@ -1026,5 +1025,154 @@ pub fn re_traverse_to_element(path: &[PathSegment], pid: i32) -> Option<AXUIElem
         CFRelease(windows_value);
         CFRelease(app_element as CFTypeRef);
         Some(current)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_process_trusted() {
+        // Smoke test — verifies the function doesn't crash
+        let _trusted = is_process_trusted();
+    }
+
+    #[test]
+    fn test_format_snapshot_basic() {
+        let node = AXNode {
+            role: "AXButton".to_string(),
+            title: Some("OK".to_string()),
+            description: None,
+            value: None,
+            frame: Some(Rect {
+                x: 100.0,
+                y: 200.0,
+                width: 80.0,
+                height: 30.0,
+            }),
+            actions: vec!["AXPress".to_string()],
+            is_interactive: true,
+            children: vec![],
+            depth: 0,
+            path_segment: PathSegment {
+                role: "AXButton".to_string(),
+                index: 0,
+            },
+        };
+
+        let (text, refs) = format_snapshot_text(
+            &[node],
+            "TestApp",
+            &Some("Main Window".to_string()),
+            true,
+            1234,
+        );
+
+        assert!(text.contains("[TestApp — Main Window]"));
+        assert!(text.contains("@e1 AXButton \"OK\""));
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].id, "e1");
+        assert_eq!(refs[0].role, "AXButton");
+        assert_eq!(refs[0].label, Some("OK".to_string()));
+        assert_eq!(refs[0].ax_pid, Some(1234));
+    }
+
+    #[test]
+    fn test_format_snapshot_label_truncation() {
+        let long_label = "A".repeat(80);
+        let node = AXNode {
+            role: "AXTextField".to_string(),
+            title: Some(long_label),
+            description: None,
+            value: None,
+            frame: None,
+            actions: vec![],
+            is_interactive: true,
+            children: vec![],
+            depth: 0,
+            path_segment: PathSegment {
+                role: "AXTextField".to_string(),
+                index: 0,
+            },
+        };
+
+        let (text, _) = format_snapshot_text(&[node], "App", &None, true, 1);
+        // Should be truncated to 57 chars + "..."
+        assert!(text.contains("..."));
+    }
+
+    #[test]
+    fn test_format_snapshot_context_roles() {
+        let child = AXNode {
+            role: "AXButton".to_string(),
+            title: Some("Click".to_string()),
+            description: None,
+            value: None,
+            frame: None,
+            actions: vec![],
+            is_interactive: true,
+            children: vec![],
+            depth: 1,
+            path_segment: PathSegment {
+                role: "AXButton".to_string(),
+                index: 0,
+            },
+        };
+
+        let parent = AXNode {
+            role: "AXToolbar".to_string(),
+            title: Some("Main Toolbar".to_string()),
+            description: None,
+            value: None,
+            frame: None,
+            actions: vec![],
+            is_interactive: false,
+            children: vec![child],
+            depth: 0,
+            path_segment: PathSegment {
+                role: "AXToolbar".to_string(),
+                index: 0,
+            },
+        };
+
+        // interactive_only=false should show context roles
+        let (text, refs) = format_snapshot_text(&[parent], "App", &None, false, 1);
+        assert!(text.contains("AXToolbar \"Main Toolbar\""));
+        assert!(text.contains("@e1 AXButton \"Click\""));
+        assert_eq!(refs.len(), 1);
+    }
+
+    #[test]
+    fn test_format_snapshot_non_interactive_skip() {
+        let node = AXNode {
+            role: "AXStaticText".to_string(),
+            title: Some("Just text".to_string()),
+            description: None,
+            value: None,
+            frame: None,
+            actions: vec![],
+            is_interactive: false,
+            children: vec![],
+            depth: 0,
+            path_segment: PathSegment {
+                role: "AXStaticText".to_string(),
+                index: 0,
+            },
+        };
+
+        let (text, refs) = format_snapshot_text(&[node], "App", &None, true, 1);
+        assert!(!text.contains("AXStaticText"));
+        assert_eq!(refs.len(), 0);
+    }
+
+    #[test]
+    fn test_get_frontmost_app() {
+        // Smoke test — should not crash. May return None in CI.
+        let result = get_frontmost_app();
+        if let Some((name, pid)) = result {
+            assert!(!name.is_empty());
+            assert!(pid > 0);
+        }
     }
 }

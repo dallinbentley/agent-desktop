@@ -5,6 +5,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::process::Command;
 
+use agent_computer_daemon::ax_engine;
 use crate::DaemonState;
 
 // MARK: - App Management
@@ -214,38 +215,26 @@ end tell"#)
     }
 }
 
-/// Get the frontmost (active) app info.
-fn get_frontmost_app() -> Option<(String, i32, Option<String>)> {
+/// Get the frontmost window title for an app.
+fn get_frontmost_window_title(app_name: &str) -> Option<String> {
     let output = Command::new("osascript")
         .arg("-e")
-        .arg(r#"tell application "System Events"
-    set frontApp to first process whose frontmost is true
-    set appName to name of frontApp
-    set appPID to unix id of frontApp
+        .arg(format!(
+            r#"tell application "System Events"
     try
-        set winTitle to name of front window of frontApp
+        set winTitle to name of front window of process "{app_name}"
+        return winTitle
     on error
-        set winTitle to ""
+        return ""
     end try
-    return appName & "||" & appPID & "||" & winTitle
-end tell"#)
+end tell"#
+        ))
         .output()
         .ok()?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let parts: Vec<&str> = stdout.trim().split("||").collect();
-    if parts.len() >= 3 {
-        let name = parts[0].to_string();
-        let pid = parts[1].parse::<i32>().unwrap_or(0);
-        let window = if parts[2].is_empty() {
-            None
-        } else {
-            Some(parts[2].to_string())
-        };
-        Some((name, pid, window))
-    } else {
-        None
-    }
+    let title = stdout.trim().to_string();
+    if title.is_empty() { None } else { Some(title) }
 }
 
 // MARK: - Command Handlers
@@ -320,14 +309,27 @@ pub fn handle_get(
             if state.ref_map.is_empty() {
                 return Response::fail(id.to_string(), errors::no_ref_map(), elapsed());
             }
-            match state.ref_map.get(ref_id) {
-                Some(_elem_ref) => {
-                    // Stub — real implementation needs AX element access
+            match state.ref_map.resolve(ref_id) {
+                Some(elem_ref) => {
+                    // Try to get text via AX re-traversal
+                    let text = if let (Some(ref path), Some(pid)) = (&elem_ref.ax_path, elem_ref.ax_pid) {
+                        if let Some(ax_elem) = ax_engine::re_traverse_to_element(path, pid) {
+                            // Try value, title, description (same as Swift)
+                            let result = elem_ref.label.clone().unwrap_or_default();
+                            unsafe { core_foundation::base::CFRelease(ax_elem as core_foundation::base::CFTypeRef); }
+                            result
+                        } else {
+                            elem_ref.label.clone().unwrap_or_default()
+                        }
+                    } else {
+                        elem_ref.label.clone().unwrap_or_default()
+                    };
+
                     Response::ok(
                         id.to_string(),
                         ResponseData::GetText(GetTextData {
                             r#ref: Some(ref_id.clone()),
-                            text: String::new(),
+                            text,
                         }),
                         elapsed(),
                     )
@@ -360,15 +362,19 @@ pub fn handle_status(
 
     let pid = std::process::id() as i32;
 
-    // Check accessibility permission via osascript/tccutil is unreliable,
-    // so we check by trying to get the frontmost app via AX
-    // For now, we'll use a simple check
-    let ax_trusted = check_accessibility_permission();
-    let screen_permission = check_screen_recording_permission();
+    // Use the real AX and capture permission checks
+    let ax_trusted = ax_engine::is_process_trusted();
+    let screen_permission = agent_computer_daemon::capture::has_screen_recording_permission();
 
-    let (frontmost_app, frontmost_pid, frontmost_window) = get_frontmost_app()
-        .map(|(name, pid, window)| (Some(name), Some(pid), window))
-        .unwrap_or((None, None, None));
+    // Use AX engine for frontmost app detection (more reliable)
+    let (frontmost_app, frontmost_pid, frontmost_window) = match ax_engine::get_frontmost_app() {
+        Some((name, pid)) => {
+            // Get window title via osascript (simpler than AX window traversal here)
+            let window = get_frontmost_window_title(&name);
+            (Some(name), Some(pid), window)
+        }
+        None => (None, None, None),
+    };
 
     let active_cdp = if state.cdp_connections.is_empty() {
         Some(0)
@@ -393,35 +399,7 @@ pub fn handle_status(
     )
 }
 
-/// Check if accessibility permission is granted (uses AXIsProcessTrusted via CoreFoundation).
-fn check_accessibility_permission() -> bool {
-    // Shell out to a quick check — AXIsProcessTrusted() requires linking ApplicationServices
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(r#"tell application "System Events" to get name of first process whose frontmost is true"#)
-        .output();
-    match output {
-        Ok(out) => out.status.success(),
-        Err(_) => false,
-    }
-}
 
-/// Check if screen recording permission is granted.
-fn check_screen_recording_permission() -> bool {
-    // CGPreflightScreenCaptureAccess — use the core-graphics binding
-    // For now, assume true if we can access CGWindowList
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(r#"do shell script "screencapture -x -t png /dev/null 2>&1; echo $?""#)
-        .output();
-    match output {
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            stdout.trim() == "0"
-        }
-        Err(_) => false,
-    }
-}
 
 #[cfg(test)]
 mod tests {

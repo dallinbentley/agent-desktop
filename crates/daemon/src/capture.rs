@@ -21,7 +21,6 @@ use std::ffi::c_void;
 
 // Raw CFArray access
 extern "C" {
-    fn CFArrayGetCount(array: core_foundation::array::CFArrayRef) -> isize;
     fn CFArrayGetValueAtIndex(array: core_foundation::array::CFArrayRef, idx: isize) -> *const c_void;
 }
 
@@ -363,4 +362,38 @@ pub fn translate_image_to_screen(
     window_origin_y: f64,
 ) -> (f64, f64) {
     (window_origin_x + image_x, window_origin_y + image_y)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_coordinate_translation() {
+        let (sx, sy) = translate_image_to_screen(100.0, 200.0, 50.0, 75.0);
+        assert_eq!(sx, 150.0);
+        assert_eq!(sy, 275.0);
+    }
+
+    #[test]
+    fn test_coordinate_translation_zero_origin() {
+        let (sx, sy) = translate_image_to_screen(300.0, 400.0, 0.0, 0.0);
+        assert_eq!(sx, 300.0);
+        assert_eq!(sy, 400.0);
+    }
+
+    #[test]
+    fn test_has_screen_recording_permission() {
+        // This is a smoke test — just checks the function doesn't crash
+        let _ = has_screen_recording_permission();
+    }
+
+    #[test]
+    fn test_get_window_list() {
+        // Smoke test — verifies we can call the window list API
+        let windows = get_window_list();
+        // On a running Mac, there should be at least some windows
+        // (but in CI this might be empty)
+        let _ = windows;
+    }
 }

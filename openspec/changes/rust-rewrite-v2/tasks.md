@@ -18,17 +18,17 @@
 
 ## 4. AX Engine (Accessibility Tree)
 
-- [ ] 4.1 Create daemon/src/ax_engine.rs: port AX tree traversal from Swift Sources/Daemon/Snapshot.swift using accessibility-sys crate. AXUIElementCreateApplication → get windows → recursive traverse with batch attribute fetching. Respect depth limit and 3s timeout. Return structured tree.
-- [ ] 4.2 Port interactive element filtering (19 roles from shared/types.rs). Port snapshot text formatter: [AppName — WindowTitle] header, indented tree, @eN role "label" per interactive element.
-- [ ] 4.3 Implement AX-first headless actions: ax_press(element) using AXUIElementPerformAction(kAXPressAction), ax_set_value(element, text) using kAXValueAttribute with read-back verification, ax_selection_replace(element, text) using kAXSelectedTextRangeAttribute + kAXSelectedTextAttribute.
-- [ ] 4.4 Implement frontmost app detection with 3-tier fallback: AX systemWide kAXFocusedApplicationAttribute → NSWorkspace.frontmostApplication (via objc) → CGWindowListCopyWindowInfo (first window at layer 0).
+- [x] 4.1 Create daemon/src/ax_engine.rs: port AX tree traversal from Swift Sources/Daemon/Snapshot.swift using raw FFI to ApplicationServices. AXUIElementCreateApplication → get windows → recursive traverse with batch attribute fetching. Respect depth limit and 3s timeout. Return structured tree.
+- [x] 4.2 Port interactive element filtering (19 roles from shared/types.rs). Port snapshot text formatter: [AppName — WindowTitle] header, indented tree, @eN role "label" per interactive element.
+- [x] 4.3 Implement AX-first headless actions: ax_press(element) using AXUIElementPerformAction(kAXPressAction), ax_set_value(element, text) using kAXValueAttribute with read-back verification, ax_selection_replace(element, text) using kAXSelectedTextRangeAttribute + kAXSelectedTextAttribute.
+- [x] 4.4 Implement frontmost app detection with 3-tier fallback: AX systemWide kAXFocusedApplicationAttribute → NSWorkspace.frontmostApplication (via objc2-app-kit) → CGWindowListCopyWindowInfo (first window at layer 0).
 
 ## 5. Input Engine (CGEvent Fallback)
 
-- [ ] 5.1 Create daemon/src/input.rs: port mouse click from Swift Sources/Daemon/Input.swift using core-graphics crate. CGWarpMouseCursorPosition + CGEvent mouseDown/mouseUp. Support left, right, double click.
-- [ ] 5.2 Port keyboard press: CGEvent with virtual keycodes + modifier flags. Use key_name_to_code from shared.
-- [ ] 5.3 Port string typing: CGEvent keyboardSetUnicodeString, chunk at 20 UTF-16 units, Return keycode for newlines.
-- [ ] 5.4 Port scroll: CGEvent scroll wheel with direction mapping.
+- [x] 5.1 Create daemon/src/input.rs: port mouse click from Swift Sources/Daemon/Input.swift using core-graphics crate. CGWarpMouseCursorPosition + CGEvent mouseDown/mouseUp. Support left, right, double click.
+- [x] 5.2 Port keyboard press: CGEvent with virtual keycodes + modifier flags. Use key_name_to_code from shared.
+- [x] 5.3 Port string typing: CGEvent keyboardSetUnicodeString, chunk at 20 UTF-16 units, Return keycode for newlines.
+- [x] 5.4 Port scroll: CGEvent scroll wheel with direction mapping.
 
 ## 6. CDP Engine (Chrome DevTools Protocol)
 
@@ -47,9 +47,9 @@
 
 ## 8. Screenshot Engine
 
-- [ ] 8.1 Create daemon/src/capture.rs: port screenshot capture from Swift Sources/Daemon/Capture.swift using screencapturekit-rs. Capture frontmost window (using corrected ordering via CGWindowList) or specific app's window (background capture via desktopIndependentWindow). Save PNG to temp dir.
-- [ ] 8.2 Add window frame data to ScreenshotData response: windowOriginX, windowOriginY, appName. Enable coordinate-based clicking from screenshot coordinates.
-- [ ] 8.3 Implement coordinate-click translation: when click receives image-relative coordinates + app name, look up window frame, translate to screen coordinates (screen_x = origin_x + image_x at 1x), bring app to front, CGEvent click.
+- [x] 8.1 Create daemon/src/capture.rs: port screenshot capture using CGWindowListCreateImage (legacy but fast ~8ms). Capture frontmost window or specific app's window. Save PNG to temp dir via ImageIO.
+- [x] 8.2 Add window frame data to ScreenshotData response: windowOriginX, windowOriginY, appName. Enable coordinate-based clicking from screenshot coordinates.
+- [x] 8.3 Implement coordinate-click translation: when click receives image-relative coordinates + app name, look up window frame, translate to screen coordinates (screen_x = origin_x + image_x at 1x), bring app to front, CGEvent click.
 
 ## 9. Unified RefMap
 
@@ -65,8 +65,8 @@
 
 ## 11. Wire Everything Together
 
-- [ ] 11.1 Wire all command handlers in daemon dispatch: snapshot (detect → route → AX/CDP/merged → format → respond), click (resolve ref → dispatch to correct engine), fill, type, press, scroll, screenshot, open, get, status.
-- [ ] 11.2 Implement the full interaction fallback chain: for click → try AX action first → if fails try CGEvent → return error. For fill → try kAXValueAttribute → try selection-replace → try CGEvent Cmd+A+type → return error. For CDP refs → CDP commands (no fallback needed).
+- [x] 11.1 Wire all command handlers in daemon dispatch: snapshot (detect → route → AX/CDP/merged → format → respond), click (resolve ref → dispatch to correct engine), fill, type, press, scroll, screenshot, open, get, status.
+- [x] 11.2 Implement the full interaction fallback chain: for click → try AX action first → if fails try CGEvent → return error. For fill → try kAXValueAttribute → try selection-replace → try CGEvent Cmd+A+type → return error. For CDP refs → CDP commands (no fallback needed).
 
 ## 12. End-to-End Testing
 
