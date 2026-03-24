@@ -10,7 +10,7 @@ A CLI tool that lets AI agents control any macOS application through accessibili
 
 Install from source: `cargo install --path crates/cli && cargo install --path crates/daemon`. macOS 13+ (Ventura) required. On first run, grant **Accessibility** and **Screen Recording** permissions in System Settings → Privacy & Security. Run `agent-computer status` to verify.
 
-**Optional:** For Electron/CDP app support (VS Code, Slack, Spotify, etc.), install agent-browser: `npm i -g agent-browser`. The daemon uses it internally — you never call it directly.
+**Electron/CDP support** is built in — the daemon automatically downloads and bundles [agent-browser](https://github.com/vercel-labs/agent-browser) on first use (cached at `~/.agent-computer/bin/`). No manual install needed. You never call agent-browser directly.
 
 ## Core Workflow
 
@@ -190,7 +190,7 @@ agent-computer screenshot  # Verify result
 
 ### Electron Apps with CDP
 
-Requires agent-browser installed (`npm i -g agent-browser`). The daemon uses it as an internal subprocess — you never call agent-browser directly.
+The daemon auto-downloads agent-browser on first CDP use — no manual install needed.
 
 ```bash
 # Launch with Chrome DevTools Protocol for richer inspection
@@ -235,7 +235,7 @@ agent-computer (CLI)  ──Unix Socket──▶  agent-computer-daemon  ──�
 - The **daemon** runs in the background, maintaining element references, caching accessibility trees, and routing commands
 - The daemon **auto-starts** when you run any CLI command — no manual setup needed
 - Both binaries (`agent-computer` and `agent-computer-daemon`) must be on your PATH
-- For **Electron/CDP apps**, the daemon internally delegates to [agent-browser](https://github.com/vercel-labs/agent-browser) via subprocess. Install it with `npm i -g agent-browser` — you never need to call it directly. All interaction goes through `agent-computer` commands, and the daemon handles routing transparently
+- For **Electron/CDP apps**, the daemon internally delegates to [agent-browser](https://github.com/vercel-labs/agent-browser) via subprocess. It auto-downloads the correct platform binary on first use (pinned to a known-good version) and caches it at `~/.agent-computer/bin/`. You never call agent-browser directly — all interaction goes through `agent-computer` commands, and the daemon handles routing transparently. If auto-download fails (no network), it falls back to any agent-browser found in PATH
 
 ## Snapshot Output Format
 

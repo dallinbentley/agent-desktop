@@ -6,13 +6,17 @@ agent-computer can use Chrome DevTools Protocol (CDP) for enhanced inspection an
 
 ## Prerequisites
 
-CDP mode requires [agent-browser](https://github.com/vercel-labs/agent-browser) installed as a subprocess dependency:
+CDP mode uses [agent-browser](https://github.com/vercel-labs/agent-browser) as an internal subprocess dependency. **No manual install needed** — the daemon automatically downloads the correct platform binary on first CDP use and caches it at `~/.agent-computer/bin/agent-browser` (pinned to version `0.22.1`). It also runs `agent-browser install` to download Chrome for Testing.
 
-```bash
-npm install -g agent-browser
-```
+Detection order:
+1. Bundled binary at `~/.agent-computer/bin/agent-browser`
+2. System PATH (`which agent-browser`)
+3. Common npm/nvm global paths
+4. Auto-download from npm registry (last resort)
 
-You **never call agent-browser directly**. The daemon uses it internally to communicate with Electron apps via CDP. All commands go through `agent-computer` — the daemon handles routing transparently. If agent-browser is not installed, the daemon falls back to native macOS accessibility (which works but provides less detail for web content inside Electron apps).
+You **never call agent-browser directly**. All commands go through `agent-computer` — the daemon handles routing transparently. If agent-browser can't be found or downloaded, Electron/browser features are disabled but native app features work normally.
+
+To manually trigger the download: `agent-computer --install-browser`
 
 ## What is CDP Mode?
 
@@ -115,6 +119,7 @@ The daemon handles routing transparently — you interact with all refs the same
 - **CDP mode launches a fresh instance**: Existing app state (logged-in sessions) may not be preserved — the app relaunches with debugging flags
 - **Port conflicts**: If the assigned CDP port is in use, the daemon tries alternative ports
 - **Background launch**: `--with-cdp` implies `--background` — the app launches hidden to avoid focus stealing. Use `agent-computer open <app>` afterward to bring it to the foreground
+- **~160ms per bridge call**: Each subprocess call to agent-browser costs ~160ms (3ms binary startup + 157ms socket connect). Sessions are pre-warmed on `open --with-cdp` to hide initial latency
 
 ## Troubleshooting
 
@@ -124,6 +129,13 @@ The app either:
 - Isn't Electron/CEF-based (use native AX mode instead)
 - Blocks remote debugging
 - Hasn't finished launching (try `agent-computer wait 3000`)
+
+### "agent-browser not found" / auto-download failed
+
+The daemon tried to auto-download but failed (likely no network):
+- Manually install: `npm install -g agent-browser`
+- Or trigger bundled download: `agent-computer --install-browser`
+- Native AX features still work — only Electron/CDP is affected
 
 ### CDP snapshot is empty
 
@@ -135,4 +147,4 @@ agent-computer snapshot -i
 
 ### Mixed AX + CDP refs
 
-This is normal. The daemon unifies refs from both sources. Native chrome (title bar, native menus) comes from AX; web content comes from CDP.
+This is normal. The daemon unifies refs from both sources. Native chrome (title bar, native menus) comes from AX; web content comes from CDP. The daemon uses `--json` mode with agent-browser for structured parsing (no regex), so ref data is reliable.
