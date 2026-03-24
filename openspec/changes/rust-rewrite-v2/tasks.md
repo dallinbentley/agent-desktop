@@ -70,8 +70,8 @@
 
 ## 12. End-to-End Testing
 
-- [ ] 12.1 Test native app flow: `open "System Settings"` → `snapshot -i` → verify @refs → `click @e<About>` → verify navigation → `screenshot` → verify PNG.
-- [ ] 12.2 Test Electron app flow (if CDP available): `open --with-cdp Slack` → `snapshot -i` → verify rich CDP refs (labeled buttons, channels) → `click @e<channel>` → verify navigation.
-- [ ] 12.3 Test browser flow (if Chrome available): `open --with-cdp Chrome` → `snapshot -i` → verify merged output (AX chrome + CDP web content) → `click @e<web_link>` → verify navigation.
-- [ ] 12.4 Test fallback flow: `snapshot --app Spotify` (no CDP) → verify screenshot fallback with warning message. Test coordinate click.
-- [ ] 12.5 Build release binary, test `agent-computer --help`, verify daemon auto-start, verify clean shutdown, verify CDP connections close on shutdown.
+- [x] 12.1 Test native app flow: `open "System Settings"` → `snapshot -i` → verify @refs → `click @e<About>` → verify navigation → `screenshot` → verify PNG.
+- [x] 12.2 Test Electron app flow (if CDP available): `open --with-cdp Slack` → `snapshot -i` → verify rich CDP refs (labeled buttons, channels) → `click @e<channel>` → verify navigation.
+- [x] 12.3 Test browser flow (if Chrome available): `open --with-cdp Chrome` → `snapshot -i` → verify merged output (AX chrome + CDP web content) → `click @e<web_link>` → verify navigation.
+- [x] 12.4 Test fallback flow: `snapshot --app Spotify` (no CDP) → verify screenshot fallback with warning message. Test coordinate click.
+- [x] 12.5 Build release binary, test `agent-computer --help`, verify daemon auto-start, verify clean shutdown, verify CDP connections close on shutdown.
