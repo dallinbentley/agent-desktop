@@ -112,6 +112,8 @@ pub struct OpenArgs {
     pub target: String,
     #[serde(default)]
     pub with_cdp: bool,
+    #[serde(default)]
+    pub background: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -151,9 +151,13 @@ enum Commands {
         /// Application name or bundle ID
         target: String,
 
-        /// Relaunch with Chrome DevTools Protocol enabled
+        /// Relaunch with Chrome DevTools Protocol enabled (launches hidden)
         #[arg(long)]
         with_cdp: bool,
+
+        /// Launch in background without stealing focus
+        #[arg(long)]
+        background: bool,
     },
 
     /// Get information (text, title, apps, windows)
@@ -405,10 +409,11 @@ fn main() {
             };
             ("screenshot", serde_json::to_value(args).unwrap())
         }
-        Commands::Open { target, with_cdp } => {
+        Commands::Open { target, with_cdp, background } => {
             let args = OpenArgs {
                 target: target.clone(),
                 with_cdp: *with_cdp,
+                background: *background || *with_cdp, // --with-cdp implies background
             };
             ("open", serde_json::to_value(args).unwrap())
         }

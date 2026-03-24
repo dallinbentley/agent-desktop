@@ -11,7 +11,17 @@ use crate::DaemonState;
 // MARK: - App Management
 
 /// Open or focus an application. Uses `open -a` for simplicity and reliability.
+/// If `background` is true, launches hidden without stealing focus.
 pub fn open_app(name: &str) -> Result<(String, i32, bool), agent_computer_shared::types::ErrorInfo> {
+    open_app_with_options(name, false)
+}
+
+/// Open app in background (hidden, no focus steal).
+pub fn open_app_background(name: &str) -> Result<(String, i32, bool), agent_computer_shared::types::ErrorInfo> {
+    open_app_with_options(name, true)
+}
+
+fn open_app_with_options(name: &str, background: bool) -> Result<(String, i32, bool), agent_computer_shared::types::ErrorInfo> {
     // Check if already running via pgrep-style approach using `osascript`
     let check = Command::new("osascript")
         .arg("-e")
@@ -29,8 +39,13 @@ pub fn open_app(name: &str) -> Result<(String, i32, bool), agent_computer_shared
         Err(_) => false,
     };
 
-    // Use `open -a` to open/focus
-    let result = Command::new("open").arg("-a").arg(name).output();
+    // Use `open -a` to open. Add flags for background mode.
+    let mut cmd = Command::new("open");
+    if background {
+        cmd.arg("-gj"); // -g = don't bring to front, -j = launch hidden
+    }
+    cmd.arg("-a").arg(name);
+    let result = cmd.output();
 
     match result {
         Ok(output) => {
@@ -105,7 +120,10 @@ pub fn open_app_with_cdp(
         state.cdp_port_map.remove(&old_pid);
     }
 
-    // Relaunch with CDP flag — for Electron apps, pass --remote-debugging-port
+    // Relaunch with CDP flag
+    // Note: some apps (e.g. Spotify) force-activate on launch — this is app-specific
+    // behavior we can't override. The one-time focus steal is acceptable since all
+    // subsequent interactions are fully headless via --app.
     let result = Command::new("open")
         .arg("-a")
         .arg(name)
@@ -334,7 +352,12 @@ pub fn handle_open(
             Err(e) => Response::fail(id.to_string(), e, elapsed()),
         }
     } else {
-        match open_app(&args.target) {
+        let result = if args.background {
+            open_app_background(&args.target)
+        } else {
+            open_app(&args.target)
+        };
+        match result {
             Ok((app_name, pid, was_running)) => Response::ok(
                 id.to_string(),
                 ResponseData::Open(OpenData {
