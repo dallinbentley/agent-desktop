@@ -48,11 +48,11 @@
 ## 8. Error Handling & Polish
 
 - [x] 8.1 Implement AI-friendly error messages for all error paths: REF_NOT_FOUND, REF_STALE, NO_REF_MAP, APP_NOT_FOUND, PERMISSION_DENIED, TIMEOUT, AX_ERROR, INPUT_ERROR, INVALID_COMMAND, DAEMON_ERROR. Each with code, message, and suggestion.
-- [ ] 8.2 Add element re-identification: when resolving a ref for action, first try re-traversing the stored axPath. If element not found at path, try coordinate fallback. If neither works, return stale ref error.
+- [x] 8.2 Add element re-identification: when resolving a ref for action, first try re-traversing the stored axPath. If element not found at path, try coordinate fallback. If neither works, return stale ref error.
 - [x] 8.3 Add permission-specific error handling: detect missing Accessibility permission (AXIsProcessTrusted), detect missing Screen Recording permission, return specific setup instructions for each.
 
 ## 9. End-to-End Integration Test
 
-- [ ] 9.1 Create a test script that exercises the full demo flow: `open "TextEdit"` → `snapshot -i` → verify output has @refs → `click @e<text_area>` → `type @e<ref> "Hello from agent-computer!"` → `press cmd+a` → `screenshot` → verify PNG exists → `status` → verify all green. Script should run unattended and report pass/fail.
-- [ ] 9.2 Test against Finder: open → snapshot → click a folder → snapshot again to verify UI changed.
-- [ ] 9.3 Build release binary, test `agent-computer --help`, verify daemon auto-start, verify clean shutdown.
+- [x] 9.1 Create a test script that exercises the full demo flow: `open "TextEdit"` → `snapshot -i` → verify output has @refs → `click @e<text_area>` → `type @e<ref> "Hello from agent-computer!"` → `press cmd+a` → `screenshot` → verify PNG exists → `status` → verify all green. Script should run unattended and report pass/fail.
+- [x] 9.2 Test against Finder: open → snapshot → click a folder → snapshot again to verify UI changed.
+- [x] 9.3 Build release binary, test `agent-computer --help`, verify daemon auto-start, verify clean shutdown.
